@@ -1,0 +1,10 @@
+.env
+.venv/
+.idea/
+__pycache__/
+*.pyc
+*.db
+logs/
+bot/logs/
+
+tasks.txt
