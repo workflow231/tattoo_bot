@@ -28,9 +28,7 @@ async def get_sketch_by_id_with_style(
     sketch_id: int,
 ) -> Sketch | None:
     stmt = (
-        select(Sketch)
-        .options(selectinload(Sketch.style))
-        .where(Sketch.id == sketch_id)
+        select(Sketch).options(selectinload(Sketch.style)).where(Sketch.id == sketch_id)
     )
 
     result = await session.execute(stmt)
@@ -55,14 +53,15 @@ async def find_viewed_sketch_photo_in_style(
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
 
+
 async def create_sketch(
-        session: AsyncSession,
-        style_id: int,
-        name: str,
-        description: str | None = None,
-        price: int | None = None,
-        photo_file_id: int | None = None,
-        status: str | None = None
+    session: AsyncSession,
+    style_id: int,
+    name: str,
+    description: str | None = None,
+    price: int | None = None,
+    photo_file_id: int | None = None,
+    status: str | None = None,
 ) -> bool:
 
     sketch = Sketch(
@@ -71,7 +70,7 @@ async def create_sketch(
         description=description,
         price=price,
         photo_file_id=photo_file_id,
-        status=status
+        status=status,
     )
 
     session.add(sketch)

@@ -218,3 +218,30 @@ class ScheduleException(Base):
         server_default=func.now(),
         nullable=False,
     )
+
+
+class WeeklyDayOff(Base):
+    __tablename__ = "weekly_day_offs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    # 0 = Monday, 6 = Sunday
+    weekday: Mapped[int] = mapped_column(
+        Integer,
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )

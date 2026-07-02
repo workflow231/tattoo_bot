@@ -1,10 +1,12 @@
-import os
-
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import User
-from db.repositories.user_repo import get_or_create_user, check_user_is_admin, change_admin_status
+from db.repositories.user_repo import (
+    change_admin_status,
+    get_or_create_user,
+)
+from utils.config import get_admin_ids_from_env
 
 load_dotenv()
 
@@ -23,14 +25,9 @@ class UserService:
             telegram_id=telegram_id,
             username=username,
         )
+        user, _ = user_tuple
 
-        if await check_user_is_admin(
-            session=self.session,
-            telegram_id=telegram_id
-        ):
-            await change_admin_status(
-                session=self.session,
-                admin_id=int(os.getenv("ADMIN_ID"))
-            )
+        if telegram_id in get_admin_ids_from_env() and not user.is_admin:
+            await change_admin_status(session=self.session, admin_id=telegram_id)
 
         return user_tuple

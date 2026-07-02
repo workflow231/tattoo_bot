@@ -10,9 +10,7 @@ async def get_user_by_telegram_id(
     session: AsyncSession,
     telegram_id: int,
 ) -> User | None:
-    result = await session.execute(
-        select(User).where(User.telegram_id == telegram_id)
-    )
+    result = await session.execute(select(User).where(User.telegram_id == telegram_id))
     return result.scalar_one_or_none()
 
 
@@ -54,13 +52,12 @@ async def get_or_create_user(
 
     return user, True
 
+
 async def check_user_is_admin(
-        session: AsyncSession,
-        telegram_id: int,
+    session: AsyncSession,
+    telegram_id: int,
 ) -> bool | None:
-    stmt = await session.execute(
-        select(User).where(User.telegram_id == telegram_id)
-    )
+    stmt = await session.execute(select(User).where(User.telegram_id == telegram_id))
     user = stmt.scalar_one_or_none()
 
     if not user:
@@ -68,13 +65,9 @@ async def check_user_is_admin(
 
     return user.is_admin
 
-async def change_admin_status(
-        session: AsyncSession,
-        admin_id: int
-) -> bool | None:
-    stmt = await session.execute(
-        select(User).where(User.telegram_id == admin_id)
-    )
+
+async def change_admin_status(session: AsyncSession, admin_id: int) -> bool | None:
+    stmt = await session.execute(select(User).where(User.telegram_id == admin_id))
     user = stmt.scalar_one_or_none()
 
     if not user:

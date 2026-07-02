@@ -1,0 +1,35 @@
+services:
+  bot:
+    build:
+      context: .
+    command: sh -c "alembic upgrade head && python -m bot.main"
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN:-}
+      DB_PATH: ${DB_PATH:-/app/data/tattoo_bot.db}
+      ADMIN_ID: ${ADMIN_ID:-}
+      ADMIN_IDS: ${ADMIN_IDS:-}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      SQL_ECHO: ${SQL_ECHO:-false}
+      MASTER_CONTACT: ${MASTER_CONTACT:-}
+    volumes:
+      - tattoo_bot_data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  tattoo_bot_data:
+  redis_data:

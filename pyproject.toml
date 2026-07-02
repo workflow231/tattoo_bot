@@ -1,0 +1,20 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 88
+extend-exclude = [
+    "migrations/versions",
+]
+
+[tool.black]
+line-length = 88
+extend-exclude = '''
+/(
+    \.git
+  | \.venv
+  | migrations/versions
+)/
+'''

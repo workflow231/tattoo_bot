@@ -6,7 +6,7 @@ from bot.keyboards import (
     build_sketches_reply_keyboard,
     sketch_card_kb,
 )
-from bot.utils.chunks import chunks
+from utils.chunks import chunks
 from db.models import Style, Sketch
 from db.repositories.style_repo import get_all_styles
 from db.repositories.sketch_repo import (
@@ -44,9 +44,7 @@ class SketchCatalogService:
         style_cards = await self._build_style_cards(styles)
 
         if not style_cards:
-            await message.answer(
-                "Пока нет доступных эскизов для показа в каталоге."
-            )
+            await message.answer("Пока нет доступных эскизов для показа в каталоге.")
             return
 
         for style_chunk in chunks(style_cards, 10):
@@ -143,10 +141,7 @@ class SketchCatalogService:
     def _build_short_sketch_caption(self, sketch: Sketch) -> str:
         price = f"от {sketch.price} ₽" if sketch.price else "договорная"
 
-        return (
-            f"Эскиз: {sketch.name}\n"
-            f"Цена: {price}"
-        )
+        return f"Эскиз: {sketch.name}\n" f"Цена: {price}"
 
     def _build_full_sketch_caption(self, sketch: Sketch) -> str:
         price = f"от {sketch.price} ₽" if sketch.price else "договорная"

@@ -8,7 +8,7 @@ from sqlalchemy import pool
 
 from alembic import context
 from db.session import Base
-import db.models
+import db.models  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -17,6 +17,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(PROJECT_ROOT / ".env")
 
 config = context.config
+
 
 def get_db_path() -> Path:
     raw_path = os.getenv("DB_PATH")
@@ -96,9 +97,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()

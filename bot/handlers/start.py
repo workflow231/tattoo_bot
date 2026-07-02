@@ -2,7 +2,7 @@ from aiogram import Router
 from aiogram.filters import CommandStart
 from aiogram.types import Message
 
-from core.services.user_service import UserService
+from services.user_service import UserService
 
 from bot.keyboards import menu_kb
 from db.session import SessionLocal
@@ -26,8 +26,8 @@ async def cmd_start(message: Message):
         )
 
     if created:
-        logger.info("New user registered: telegram_id=%s", telegram_id)
+        logger.info("New user registered")
         await message.answer(text="Добро пожаловать!", reply_markup=menu_kb)
     else:
-        logger.info("User already registered: telegram_id=%s", telegram_id)
+        logger.info("User already registered")
         await message.answer(text="С возвращением!", reply_markup=menu_kb)

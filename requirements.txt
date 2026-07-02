@@ -1,0 +1,7 @@
+aiogram
+aiosqlite
+alembic
+APScheduler
+python-dotenv
+redis
+SQLAlchemy

@@ -1,0 +1,23 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff
+        entry: ruff check .
+        language: system
+        pass_filenames: false
+        types_or: [python, pyi]
+
+      - id: black
+        name: black
+        entry: black --check .
+        language: system
+        pass_filenames: false
+        types_or: [python, pyi]
+
+      - id: pytest
+        name: pytest
+        entry: pytest
+        language: system
+        pass_filenames: false
+        always_run: true

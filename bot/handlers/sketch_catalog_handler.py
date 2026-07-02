@@ -6,9 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot.keyboards import (
     menu_kb,
     BACK_BUTTON,
+    CHAT_WITH_MASTER_BUTTON,
+    LEAVE_COMMENT_BUTTON,
     MAIN_MENU_BUTTON,
+    sketch_card_kb,
 )
 from services.sketch_catalog_service import SketchCatalogService
+from services.master_contact_service import MasterContactService
 from bot.states import SketchCatalogState
 
 router = Router()
@@ -16,9 +20,9 @@ router = Router()
 
 @router.message(F.text == "Каталог эскизов")
 async def sketch_catalog(
-    session: AsyncSession,
     message: Message,
     state: FSMContext,
+    session: AsyncSession,
 ):
     await state.clear()
 
@@ -33,10 +37,7 @@ async def sketch_catalog(
         )
         return
 
-    style_buttons = {
-        style.name: style.id
-        for style in styles
-    }
+    style_buttons = {style.name: style.id for style in styles}
 
     await state.update_data(style_buttons=style_buttons)
     await state.set_state(SketchCatalogState.choosing_style)
@@ -49,9 +50,9 @@ async def sketch_catalog(
 
 @router.message(SketchCatalogState.choosing_style)
 async def choose_style(
-    session: AsyncSession,
     message: Message,
     state: FSMContext,
+    session: AsyncSession,
 ):
     if message.text == MAIN_MENU_BUTTON:
         await state.clear()
@@ -76,8 +77,7 @@ async def choose_style(
         return
 
     sketch_buttons = {
-        _build_sketch_button_text(sketch): sketch.id
-        for sketch in sketches
+        _build_sketch_button_text(sketch): sketch.id for sketch in sketches
     }
 
     await state.update_data(
@@ -94,9 +94,9 @@ async def choose_style(
 
 @router.message(SketchCatalogState.choosing_sketch)
 async def choose_sketch(
-    session: AsyncSession,
     message: Message,
     state: FSMContext,
+    session: AsyncSession,
 ):
     if message.text == MAIN_MENU_BUTTON:
         await state.clear()
@@ -117,10 +117,7 @@ async def choose_sketch(
             )
             return
 
-        style_buttons = {
-            style.name: style.id
-            for style in styles
-        }
+        style_buttons = {style.name: style.id for style in styles}
 
         await state.update_data(style_buttons=style_buttons)
         await state.set_state(SketchCatalogState.choosing_style)
@@ -161,6 +158,7 @@ async def choose_sketch(
 async def sketch_selected_actions(
     message: Message,
     state: FSMContext,
+    session: AsyncSession,
 ):
     if message.text == MAIN_MENU_BUTTON:
         await state.clear()
@@ -168,11 +166,60 @@ async def sketch_selected_actions(
         return
 
     if message.text == BACK_BUTTON:
+        data = await state.get_data()
+        style_id = data.get("style_id")
+
+        if not style_id:
+            await state.clear()
+            await message.answer(
+                "Не удалось вернуться к списку эскизов. Откройте каталог заново.",
+                reply_markup=menu_kb,
+            )
+            return
+
+        service = SketchCatalogService(session=session)
+        sketches = await service.get_sketches_by_style_id(style_id=style_id)
+
+        if not sketches:
+            await state.clear()
+            await message.answer(
+                "В этом стиле пока нет доступных эскизов.",
+                reply_markup=menu_kb,
+            )
+            return
+
+        sketch_buttons = {
+            _build_sketch_button_text(sketch): sketch.id for sketch in sketches
+        }
+
+        await state.update_data(sketch_buttons=sketch_buttons)
         await state.set_state(SketchCatalogState.choosing_sketch)
-        await message.answer("Вернитесь к выбору эскиза кнопками выше.")
+        await service.send_sketches_catalog(
+            message=message,
+            sketches=sketches,
+        )
         return
 
-    await message.answer("Этот раздел пока не реализован.")
+    if message.text == CHAT_WITH_MASTER_BUTTON:
+        await message.answer(
+            MasterContactService().get_contact_text(),
+            reply_markup=sketch_card_kb,
+        )
+        return
+
+    if message.text == LEAVE_COMMENT_BUTTON:
+        await message.answer(
+            "Комментарий можно оставить при создании заявки.\n\n"
+            "Нажмите «Создать заявку», выберите дату и время, "
+            "а затем добавьте комментарий для мастера.",
+            reply_markup=sketch_card_kb,
+        )
+        return
+
+    await message.answer(
+        "Выберите действие кнопкой.",
+        reply_markup=sketch_card_kb,
+    )
 
 
 def _build_sketch_button_text(sketch) -> str:
