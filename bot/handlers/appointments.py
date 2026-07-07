@@ -27,7 +27,7 @@ from bot.keyboards import (
     build_appointment_time_keyboard,
     build_my_appointment_card_keyboard,
     build_my_appointments_keyboard,
-    menu_kb,
+    client_menu_kb,
     sketch_card_kb,
 )
 from bot.states import AppointmentState, MyAppointmentsState, SketchCatalogState
@@ -83,7 +83,7 @@ async def choose_my_appointment(
     )
 
     if not card_text:
-        await message.answer("Заявка не найдена.", reply_markup=menu_kb)
+        await message.answer("Заявка не найдена.", reply_markup=client_menu_kb)
         await state.clear()
         return
 
@@ -152,7 +152,7 @@ async def start_appointment_creation(
     if not data.get("sketch_id"):
         await message.answer(
             "Сначала выберите эскиз из каталога.",
-            reply_markup=menu_kb,
+            reply_markup=client_menu_kb,
         )
         return
 
@@ -329,7 +329,7 @@ async def confirm_appointment_creation(
 
     if message.text == CANCEL_BUTTON:
         await state.clear()
-        await message.answer("Создание заявки отменено.", reply_markup=menu_kb)
+        await message.answer("Создание заявки отменено.", reply_markup=client_menu_kb)
         return
 
     if message.text == CHANGE_DATE_BUTTON:
@@ -395,7 +395,7 @@ async def confirm_appointment_creation(
     if not appointment:
         await message.answer(
             "Не удалось создать заявку. Возможно, эскиз недоступен или слот уже занят.",
-            reply_markup=menu_kb,
+            reply_markup=client_menu_kb,
         )
         return
 
@@ -403,7 +403,7 @@ async def confirm_appointment_creation(
     await message.answer(
         "Заявка создана и ожидает подтверждения.\n\n"
         "После разговора с мастером админ подтвердит или отклонит заявку.",
-        reply_markup=menu_kb,
+        reply_markup=client_menu_kb,
     )
 
 
@@ -433,7 +433,7 @@ async def _show_appointment_summary(
         await state.clear()
         await message.answer(
             "Эскиз не найден или уже недоступен.",
-            reply_markup=menu_kb,
+            reply_markup=client_menu_kb,
         )
         return
 
@@ -451,7 +451,7 @@ async def _send_my_appointments_list(
 ) -> None:
     if not message.from_user:
         await message.answer(
-            "Не удалось определить пользователя.", reply_markup=menu_kb
+            "Не удалось определить пользователя.", reply_markup=client_menu_kb
         )
         return
 
@@ -462,7 +462,7 @@ async def _send_my_appointments_list(
 
     if not appointments:
         await state.clear()
-        await message.answer("У вас пока нет заявок.", reply_markup=menu_kb)
+        await message.answer("У вас пока нет заявок.", reply_markup=client_menu_kb)
         return
 
     appointment_buttons = {
@@ -485,7 +485,7 @@ async def _cancel_my_appointment(
 ) -> None:
     if not message.from_user:
         await message.answer(
-            "Не удалось определить пользователя.", reply_markup=menu_kb
+            "Не удалось определить пользователя.", reply_markup=client_menu_kb
         )
         return
 
@@ -494,7 +494,7 @@ async def _cancel_my_appointment(
 
     if not appointment_id:
         await state.clear()
-        await message.answer("Заявка не выбрана.", reply_markup=menu_kb)
+        await message.answer("Заявка не выбрана.", reply_markup=client_menu_kb)
         return
 
     service = AppointmentService(session=session)
@@ -505,7 +505,7 @@ async def _cancel_my_appointment(
 
     if not result_text:
         await state.clear()
-        await message.answer("Заявка не найдена.", reply_markup=menu_kb)
+        await message.answer("Заявка не найдена.", reply_markup=client_menu_kb)
         return
 
     card_text = await service.get_current_user_appointment_card(
@@ -515,7 +515,7 @@ async def _cancel_my_appointment(
 
     if not card_text:
         await state.clear()
-        await message.answer(result_text, reply_markup=menu_kb)
+        await message.answer(result_text, reply_markup=client_menu_kb)
         return
 
     await message.answer(
@@ -577,7 +577,7 @@ async def _handle_common_navigation(
 ) -> bool:
     if message.text == MAIN_MENU_BUTTON:
         await state.clear()
-        await message.answer("Главное меню", reply_markup=menu_kb)
+        await message.answer("Главное меню", reply_markup=client_menu_kb)
         return True
 
     return False

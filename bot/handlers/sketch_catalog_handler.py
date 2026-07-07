@@ -4,13 +4,13 @@ from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.keyboards import (
-    menu_kb,
     BACK_BUTTON,
     CHAT_WITH_MASTER_BUTTON,
     LEAVE_COMMENT_BUTTON,
     MAIN_MENU_BUTTON,
     sketch_card_kb,
 )
+from bot.menu_utils import get_main_menu_for_message
 from services.sketch_catalog_service import SketchCatalogService
 from services.master_contact_service import MasterContactService
 from bot.states import SketchCatalogState
@@ -33,7 +33,7 @@ async def sketch_catalog(
     if not styles:
         await message.answer(
             "К сожалению, список стилей пока пуст, но он обязательно скоро появится.",
-            reply_markup=menu_kb,
+            reply_markup=get_main_menu_for_message(session=session, message=message),
         )
         return
 
@@ -56,7 +56,10 @@ async def choose_style(
 ):
     if message.text == MAIN_MENU_BUTTON:
         await state.clear()
-        await message.answer("Главное меню", reply_markup=menu_kb)
+        await message.answer(
+            "Главное меню",
+            reply_markup=get_main_menu_for_message(session=session, message=message),
+        )
         return
 
     data = await state.get_data()
@@ -100,7 +103,10 @@ async def choose_sketch(
 ):
     if message.text == MAIN_MENU_BUTTON:
         await state.clear()
-        await message.answer("Главное меню", reply_markup=menu_kb)
+        await message.answer(
+            "Главное меню",
+            reply_markup=get_main_menu_for_message(session=session, message=message),
+        )
         return
 
     if message.text == BACK_BUTTON:
@@ -113,7 +119,10 @@ async def choose_sketch(
         if not styles:
             await message.answer(
                 "К сожалению, список стилей пока пуст.",
-                reply_markup=menu_kb,
+                reply_markup=get_main_menu_for_message(
+                    session=session,
+                    message=message,
+                ),
             )
             return
 
@@ -162,7 +171,10 @@ async def sketch_selected_actions(
 ):
     if message.text == MAIN_MENU_BUTTON:
         await state.clear()
-        await message.answer("Главное меню", reply_markup=menu_kb)
+        await message.answer(
+            "Главное меню",
+            reply_markup=get_main_menu_for_message(session=session, message=message),
+        )
         return
 
     if message.text == BACK_BUTTON:
@@ -173,7 +185,10 @@ async def sketch_selected_actions(
             await state.clear()
             await message.answer(
                 "Не удалось вернуться к списку эскизов. Откройте каталог заново.",
-                reply_markup=menu_kb,
+                reply_markup=get_main_menu_for_message(
+                    session=session,
+                    message=message,
+                ),
             )
             return
 
@@ -184,7 +199,10 @@ async def sketch_selected_actions(
             await state.clear()
             await message.answer(
                 "В этом стиле пока нет доступных эскизов.",
-                reply_markup=menu_kb,
+                reply_markup=get_main_menu_for_message(
+                    session=session,
+                    message=message,
+                ),
             )
             return
 

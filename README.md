@@ -7,6 +7,16 @@ Aiogram Telegram bot for tattoo sketch requests.
 - Bot mode: polling.
 - Database: SQLite via `DB_PATH`.
 - FSM storage: Redis via `REDIS_URL`.
+- Client main menu and master main menu are separate.
+- Master/admin access is controlled by `ADMIN_IDS`.
+- Master contact text is read from `MASTER_CONTACT`.
+
+## Main Flows
+
+- Clients can browse sketches, view the master calendar, create requests from a sketch card, see their requests, and contact the master.
+- The client calendar is view-only: booking still starts from a selected sketch.
+- The master can view appointments, manage the appointment calendar, and add new sketches.
+- When adding a sketch, the master chooses or creates a style, fills sketch fields, reviews the summary, and saves it.
 
 ## Docker Compose
 

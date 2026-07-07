@@ -49,6 +49,10 @@ class AppointmentCalendarMonth:
     title: str
     weeks: list[list[str]]
     available_dates: dict[str, str]
+    previous_year: int
+    previous_month: int
+    next_year: int
+    next_month: int
 
 
 @dataclass(frozen=True)
@@ -209,6 +213,8 @@ class AppointmentService:
         available_dates = {}
         weeks = []
         week = []
+        previous_year, previous_month = shift_month(year=year, month=month, step=-1)
+        next_year, next_month = shift_month(year=year, month=month, step=1)
 
         for day_number in range(1, last_day + 1):
             current_date = date(year, month, day_number)
@@ -241,6 +247,10 @@ class AppointmentService:
             title=f"{MONTH_NAMES[month - 1]} {year}",
             weeks=weeks,
             available_dates=available_dates,
+            previous_year=previous_year,
+            previous_month=previous_month,
+            next_year=next_year,
+            next_month=next_month,
         )
 
     @staticmethod

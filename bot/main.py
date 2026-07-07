@@ -5,7 +5,9 @@ from aiogram.fsm.storage.redis import RedisStorage
 
 from bot.handlers.admin_calendar import router as admin_calendar_router
 from bot.handlers.admin_appointments import router as admin_appointments_router
+from bot.handlers.admin_sketches import router as admin_sketches_router
 from bot.handlers.appointments import router as appointments_router
+from bot.handlers.client_calendar import router as client_calendar_router
 from bot.handlers.menu import router as menu_router
 from bot.handlers.start import router as start_router
 from bot.handlers.sketch_catalog_handler import router as sketch_catalog_router
@@ -40,6 +42,8 @@ async def main() -> None:
     dp.include_router(start_router)
     dp.include_router(admin_calendar_router)
     dp.include_router(admin_appointments_router)
+    dp.include_router(admin_sketches_router)
+    dp.include_router(client_calendar_router)
     dp.include_router(appointments_router)
     dp.include_router(sketch_catalog_router)
     dp.include_router(menu_router)

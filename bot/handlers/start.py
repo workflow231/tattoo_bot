@@ -4,7 +4,7 @@ from aiogram.types import Message
 
 from services.user_service import UserService
 
-from bot.keyboards import menu_kb
+from bot.keyboards import get_main_menu
 from db.session import SessionLocal
 
 from utils.logger import logger
@@ -25,9 +25,11 @@ async def cmd_start(message: Message):
             username=username,
         )
 
+    reply_markup = get_main_menu(is_admin=user.is_admin)
+
     if created:
         logger.info("New user registered")
-        await message.answer(text="Добро пожаловать!", reply_markup=menu_kb)
+        await message.answer(text="Добро пожаловать!", reply_markup=reply_markup)
     else:
         logger.info("User already registered")
-        await message.answer(text="С возвращением!", reply_markup=menu_kb)
+        await message.answer(text="С возвращением!", reply_markup=reply_markup)

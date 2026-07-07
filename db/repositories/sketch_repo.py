@@ -60,10 +60,10 @@ async def create_sketch(
     name: str,
     description: str | None = None,
     price: int | None = None,
-    photo_file_id: int | None = None,
-    status: str | None = None,
-) -> bool:
-
+    photo_file_id: str | None = None,
+    status: str = "available",
+    views: int = 0,
+) -> Sketch:
     sketch = Sketch(
         style_id=style_id,
         name=name,
@@ -71,9 +71,11 @@ async def create_sketch(
         price=price,
         photo_file_id=photo_file_id,
         status=status,
+        views=views,
     )
 
     session.add(sketch)
     await session.commit()
+    await session.refresh(sketch)
 
-    return True
+    return sketch

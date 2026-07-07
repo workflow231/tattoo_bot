@@ -1,4 +1,12 @@
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from datetime import date
+
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+)
+
 from db.models import Style, Sketch
 from utils.appointment_slots import DEFAULT_APPOINTMENT_TIMES
 
@@ -11,6 +19,8 @@ CHAT_WITH_MASTER_BUTTON = "👨‍🎨 Чат с мастером"
 MY_APPOINTMENTS_BUTTON = "Мои заявки"
 CANCEL_APPOINTMENT_BUTTON = "Отменить заявку"
 ADMIN_APPOINTMENTS_BUTTON = "Заявки"
+ADD_SKETCH_BUTTON = "Добавить эскиз"
+CLIENT_CALENDAR_BUTTON = "Календарь"
 CALENDAR_BUTTON = "Календарь с записями"
 ADMIN_PENDING_APPOINTMENTS_BUTTON = "Ждут подтверждения"
 ADMIN_CONFIRMED_APPOINTMENTS_BUTTON = "Подтверждённые"
@@ -35,10 +45,45 @@ ADMIN_REMOVE_WEEKLY_DAY_OFF_BUTTON = "Снять постоянный выход
 ADMIN_REMOVE_BLOCKED_SLOT_PREFIX = "Снять блокировку"
 SKIP_COMMENT_BUTTON = "Пропустить"
 CONFIRM_CREATE_REQUEST_BUTTON = "Создать заявку"
+CONFIRM_CREATE_SKETCH_BUTTON = "Сохранить эскиз"
 CHANGE_DATE_BUTTON = "Изменить дату"
 CHANGE_TIME_BUTTON = "Изменить время"
 CHANGE_COMMENT_BUTTON = "Изменить комментарий"
 CANCEL_BUTTON = "Отмена"
+CREATE_STYLE_BUTTON = "Создать новый стиль"
+AVAILABLE_STATUS_BUTTON = "Доступен"
+RESERVED_STATUS_BUTTON = "Зарезервирован"
+HIDDEN_STATUS_BUTTON = "Скрыт"
+
+ADMIN_CALENDAR_CALLBACK_PREFIX = "admcal"
+CLIENT_CALENDAR_CALLBACK_PREFIX = "clical"
+ADMIN_CALENDAR_IGNORE_CALLBACK = f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:ignore"
+CLIENT_CALENDAR_IGNORE_CALLBACK = f"{CLIENT_CALENDAR_CALLBACK_PREFIX}:ignore"
+
+
+def build_back_main_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(text=BACK_BUTTON),
+                KeyboardButton(text=MAIN_MENU_BUTTON),
+            ],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def build_skip_back_main_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=SKIP_COMMENT_BUTTON)],
+            [
+                KeyboardButton(text=BACK_BUTTON),
+                KeyboardButton(text=MAIN_MENU_BUTTON),
+            ],
+        ],
+        resize_keyboard=True,
+    )
 
 
 def build_styles_reply_keyboard(styles: list[Style]) -> ReplyKeyboardMarkup:
@@ -85,15 +130,7 @@ def build_sketches_reply_keyboard(sketches: list[Sketch]) -> ReplyKeyboardMarkup
 
 
 def build_appointment_date_keyboard() -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [
-                KeyboardButton(text=BACK_BUTTON),
-                KeyboardButton(text=MAIN_MENU_BUTTON),
-            ],
-        ],
-        resize_keyboard=True,
-    )
+    return build_back_main_keyboard()
 
 
 def build_appointment_calendar_keyboard(weeks: list[list[str]]) -> ReplyKeyboardMarkup:
@@ -253,49 +290,299 @@ def build_admin_appointment_card_keyboard() -> ReplyKeyboardMarkup:
 
 
 def build_admin_calendar_keyboard(weeks: list[list[str]]) -> ReplyKeyboardMarkup:
-    keyboard = [[KeyboardButton(text=day_text) for day_text in week] for week in weeks]
+    return build_back_main_keyboard()
+
+
+def build_admin_calendar_inline_keyboard(
+    weeks: list[list[str]],
+    year: int,
+    month: int,
+    previous_year: int,
+    previous_month: int,
+    next_year: int,
+    next_month: int,
+) -> InlineKeyboardMarkup:
+    keyboard = []
+
+    for week in weeks:
+        row = []
+        for day_text in week:
+            day_number = _extract_day_number(day_text)
+            callback_data = ADMIN_CALENDAR_IGNORE_CALLBACK
+
+            if day_number:
+                callback_data = (
+                    f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:day:"
+                    f"{date(year, month, day_number).isoformat()}"
+                )
+
+            row.append(
+                InlineKeyboardButton(
+                    text=day_text,
+                    callback_data=callback_data,
+                )
+            )
+        keyboard.append(row)
+
     keyboard.append(
         [
-            KeyboardButton(text=ADMIN_PREVIOUS_MONTH_BUTTON),
-            KeyboardButton(text=ADMIN_NEXT_MONTH_BUTTON),
+            InlineKeyboardButton(
+                text=ADMIN_PREVIOUS_MONTH_BUTTON,
+                callback_data=(
+                    f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:month:"
+                    f"{previous_year}:{previous_month}"
+                ),
+            ),
+            InlineKeyboardButton(
+                text=ADMIN_NEXT_MONTH_BUTTON,
+                callback_data=(
+                    f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:month:"
+                    f"{next_year}:{next_month}"
+                ),
+            ),
         ]
     )
-    keyboard.append([KeyboardButton(text=MAIN_MENU_BUTTON)])
 
-    return ReplyKeyboardMarkup(
-        keyboard=keyboard,
-        resize_keyboard=True,
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+def build_client_calendar_inline_keyboard(
+    weeks: list[list[str]],
+    year: int,
+    month: int,
+    previous_year: int,
+    previous_month: int,
+    next_year: int,
+    next_month: int,
+) -> InlineKeyboardMarkup:
+    keyboard = []
+
+    for week in weeks:
+        row = []
+        for day_text in week:
+            day_number = _extract_day_number(day_text)
+            callback_data = CLIENT_CALENDAR_IGNORE_CALLBACK
+
+            if day_number:
+                callback_data = (
+                    f"{CLIENT_CALENDAR_CALLBACK_PREFIX}:day:"
+                    f"{date(year, month, day_number).isoformat()}"
+                )
+
+            row.append(
+                InlineKeyboardButton(
+                    text=day_text,
+                    callback_data=callback_data,
+                )
+            )
+        keyboard.append(row)
+
+    keyboard.append(
+        [
+            InlineKeyboardButton(
+                text=APPOINTMENT_PREVIOUS_MONTH_BUTTON,
+                callback_data=(
+                    f"{CLIENT_CALENDAR_CALLBACK_PREFIX}:month:"
+                    f"{previous_year}:{previous_month}"
+                ),
+            ),
+            InlineKeyboardButton(
+                text=APPOINTMENT_NEXT_MONTH_BUTTON,
+                callback_data=(
+                    f"{CLIENT_CALENDAR_CALLBACK_PREFIX}:month:"
+                    f"{next_year}:{next_month}"
+                ),
+            ),
+        ]
     )
 
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
-def build_admin_calendar_day_keyboard(
+
+def build_admin_calendar_day_inline_keyboard(
     appointments,
     blocked_slot_texts: list[str] | None = None,
     has_temporary_day_off: bool = False,
     has_weekly_day_off: bool = False,
-) -> ReplyKeyboardMarkup:
+) -> InlineKeyboardMarkup:
     keyboard = [
-        [KeyboardButton(text=f"Открыть #{appointment.id}")]
+        [
+            InlineKeyboardButton(
+                text=f"Открыть #{appointment.id}",
+                callback_data=f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:appointment:{appointment.id}",
+            )
+        ]
         for appointment in appointments
     ]
 
     if has_temporary_day_off:
-        keyboard.append([KeyboardButton(text=ADMIN_REMOVE_TEMPORARY_DAY_OFF_BUTTON)])
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    text=ADMIN_REMOVE_TEMPORARY_DAY_OFF_BUTTON,
+                    callback_data=f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:remove_temp",
+                )
+            ]
+        )
 
     if has_weekly_day_off:
-        keyboard.append([KeyboardButton(text=ADMIN_REMOVE_WEEKLY_DAY_OFF_BUTTON)])
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    text=ADMIN_REMOVE_WEEKLY_DAY_OFF_BUTTON,
+                    callback_data=f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:remove_weekly",
+                )
+            ]
+        )
 
     for time_text in blocked_slot_texts or []:
         keyboard.append(
-            [KeyboardButton(text=f"{ADMIN_REMOVE_BLOCKED_SLOT_PREFIX} {time_text}")]
+            [
+                InlineKeyboardButton(
+                    text=f"{ADMIN_REMOVE_BLOCKED_SLOT_PREFIX} {time_text}",
+                    callback_data=(
+                        f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:remove_block:"
+                        f"{time_text.replace(':', '-')}"
+                    ),
+                )
+            ]
         )
 
     keyboard.extend(
         [
-            [KeyboardButton(text=ADMIN_ADD_DAY_OFF_BUTTON)],
-            [KeyboardButton(text=ADMIN_BLOCK_SLOT_BUTTON)],
             [
-                KeyboardButton(text=ADMIN_BACK_TO_CALENDAR_BUTTON),
+                InlineKeyboardButton(
+                    text=ADMIN_ADD_DAY_OFF_BUTTON,
+                    callback_data=f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:add_day_off",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=ADMIN_BLOCK_SLOT_BUTTON,
+                    callback_data=f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:block_slot",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=ADMIN_BACK_TO_CALENDAR_BUTTON,
+                    callback_data=f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:back_month",
+                )
+            ],
+        ]
+    )
+
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+def build_admin_day_off_type_inline_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=ADMIN_TEMPORARY_DAY_OFF_BUTTON,
+                    callback_data=f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:day_off:temporary",
+                ),
+                InlineKeyboardButton(
+                    text=ADMIN_WEEKLY_DAY_OFF_BUTTON,
+                    callback_data=f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:day_off:weekly",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text=ADMIN_BACK_TO_CALENDAR_DAY_BUTTON,
+                    callback_data=f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:back_day",
+                )
+            ],
+        ]
+    )
+
+
+def build_admin_slot_inline_keyboard() -> InlineKeyboardMarkup:
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                text=time_text,
+                callback_data=(
+                    f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:block_slot_time:"
+                    f"{time_text.replace(':', '-')}"
+                ),
+            )
+        ]
+        for time_text in DEFAULT_APPOINTMENT_TIMES
+    ]
+    keyboard.append(
+        [
+            InlineKeyboardButton(
+                text=ADMIN_BACK_TO_CALENDAR_DAY_BUTTON,
+                callback_data=f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:back_day",
+            )
+        ]
+    )
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+def build_admin_calendar_appointment_card_inline_keyboard(
+    appointment_id: int,
+) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=ADMIN_APPROVE_APPOINTMENT_BUTTON,
+                    callback_data=(
+                        f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:confirm:{appointment_id}"
+                    ),
+                ),
+                InlineKeyboardButton(
+                    text=ADMIN_REJECT_APPOINTMENT_BUTTON,
+                    callback_data=(
+                        f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:reject:{appointment_id}"
+                    ),
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text=ADMIN_WRITE_CLIENT_BUTTON,
+                    callback_data=(
+                        f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:client:{appointment_id}"
+                    ),
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=ADMIN_BACK_TO_CALENDAR_DAY_BUTTON,
+                    callback_data=f"{ADMIN_CALENDAR_CALLBACK_PREFIX}:back_day",
+                )
+            ],
+        ]
+    )
+
+
+def build_admin_sketch_style_keyboard(styles: list[Style]) -> ReplyKeyboardMarkup:
+    return build_admin_sketch_style_names_keyboard([style.name for style in styles])
+
+
+def build_admin_sketch_style_names_keyboard(
+    style_names: list[str],
+) -> ReplyKeyboardMarkup:
+    keyboard = []
+    row = []
+
+    for style_name in style_names:
+        row.append(KeyboardButton(text=style_name))
+
+        if len(row) == 2:
+            keyboard.append(row)
+            row = []
+
+    if row:
+        keyboard.append(row)
+
+    keyboard.extend(
+        [
+            [KeyboardButton(text=CREATE_STYLE_BUTTON)],
+            [
+                KeyboardButton(text=BACK_BUTTON),
                 KeyboardButton(text=MAIN_MENU_BUTTON),
             ],
         ]
@@ -307,15 +594,16 @@ def build_admin_calendar_day_keyboard(
     )
 
 
-def build_admin_day_off_type_keyboard() -> ReplyKeyboardMarkup:
+def build_admin_sketch_status_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
             [
-                KeyboardButton(text=ADMIN_TEMPORARY_DAY_OFF_BUTTON),
-                KeyboardButton(text=ADMIN_WEEKLY_DAY_OFF_BUTTON),
+                KeyboardButton(text=AVAILABLE_STATUS_BUTTON),
+                KeyboardButton(text=RESERVED_STATUS_BUTTON),
             ],
+            [KeyboardButton(text=HIDDEN_STATUS_BUTTON)],
             [
-                KeyboardButton(text=CANCEL_BUTTON),
+                KeyboardButton(text=BACK_BUTTON),
                 KeyboardButton(text=MAIN_MENU_BUTTON),
             ],
         ],
@@ -323,33 +611,12 @@ def build_admin_day_off_type_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
-def build_admin_slot_keyboard() -> ReplyKeyboardMarkup:
-    keyboard = [
-        [KeyboardButton(text=time_text)] for time_text in DEFAULT_APPOINTMENT_TIMES
-    ]
-    keyboard.append(
-        [
-            KeyboardButton(text=CANCEL_BUTTON),
-            KeyboardButton(text=MAIN_MENU_BUTTON),
-        ]
-    )
-
-    return ReplyKeyboardMarkup(
-        keyboard=keyboard,
-        resize_keyboard=True,
-    )
-
-
-def build_admin_calendar_appointment_card_keyboard() -> ReplyKeyboardMarkup:
+def build_admin_sketch_confirm_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
+            [KeyboardButton(text=CONFIRM_CREATE_SKETCH_BUTTON)],
             [
-                KeyboardButton(text=ADMIN_APPROVE_APPOINTMENT_BUTTON),
-                KeyboardButton(text=ADMIN_REJECT_APPOINTMENT_BUTTON),
-            ],
-            [KeyboardButton(text=ADMIN_WRITE_CLIENT_BUTTON)],
-            [
-                KeyboardButton(text=ADMIN_BACK_TO_CALENDAR_DAY_BUTTON),
+                KeyboardButton(text=BACK_BUTTON),
                 KeyboardButton(text=MAIN_MENU_BUTTON),
             ],
         ],
@@ -370,15 +637,14 @@ sketch_card_kb = ReplyKeyboardMarkup(
     resize_keyboard=True,
 )
 
-menu_kb = ReplyKeyboardMarkup(
+client_menu_kb = ReplyKeyboardMarkup(
     keyboard=[
         [
             KeyboardButton(text="Каталог эскизов"),
-            KeyboardButton(text=CALENDAR_BUTTON),
+            KeyboardButton(text=CLIENT_CALENDAR_BUTTON),
         ],
         [
             KeyboardButton(text=MY_APPOINTMENTS_BUTTON),
-            KeyboardButton(text=ADMIN_APPOINTMENTS_BUTTON),
         ],
         [
             KeyboardButton(text=CHAT_WITH_MASTER_BUTTON),
@@ -386,3 +652,35 @@ menu_kb = ReplyKeyboardMarkup(
     ],
     resize_keyboard=True,
 )
+
+master_menu_kb = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text="Каталог эскизов"),
+            KeyboardButton(text=CALENDAR_BUTTON),
+        ],
+        [
+            KeyboardButton(text=ADMIN_APPOINTMENTS_BUTTON),
+            KeyboardButton(text=ADD_SKETCH_BUTTON),
+        ],
+        [
+            KeyboardButton(text=CHAT_WITH_MASTER_BUTTON),
+        ],
+    ],
+    resize_keyboard=True,
+)
+
+menu_kb = client_menu_kb
+
+
+def get_main_menu(is_admin: bool) -> ReplyKeyboardMarkup:
+    return master_menu_kb if is_admin else client_menu_kb
+
+
+def _extract_day_number(day_text: str) -> int | None:
+    day_number_text = day_text.split(" ", maxsplit=1)[0].strip()
+
+    if not day_number_text.isdigit():
+        return None
+
+    return int(day_number_text)

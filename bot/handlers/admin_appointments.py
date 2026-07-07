@@ -19,7 +19,7 @@ from bot.keyboards import (
     build_admin_appointment_card_keyboard,
     build_admin_appointment_filters_keyboard,
     build_admin_appointments_keyboard,
-    menu_kb,
+    master_menu_kb,
 )
 from bot.states import AdminAppointmentState
 from services.admin_appointment_service import AdminAppointmentService
@@ -43,7 +43,7 @@ async def show_admin_appointment_filters(
     await state.clear()
 
     if not _message_from_admin(session=session, message=message):
-        await message.answer("Недостаточно прав.", reply_markup=menu_kb)
+        await message.answer("Недостаточно прав.")
         return
 
     await state.set_state(AdminAppointmentState.choosing_filter)
@@ -64,7 +64,7 @@ async def choose_admin_appointment_filter(
 
     if not _message_from_admin(session=session, message=message):
         await state.clear()
-        await message.answer("Недостаточно прав.", reply_markup=menu_kb)
+        await message.answer("Недостаточно прав.")
         return
 
     if message.text not in ADMIN_FILTER_BUTTONS:
@@ -93,7 +93,7 @@ async def choose_admin_appointment(
 
     if not _message_from_admin(session=session, message=message):
         await state.clear()
-        await message.answer("Недостаточно прав.", reply_markup=menu_kb)
+        await message.answer("Недостаточно прав.")
         return
 
     if message.text == BACK_BUTTON:
@@ -138,7 +138,7 @@ async def view_admin_appointment_action(
 
     if not _message_from_admin(session=session, message=message):
         await state.clear()
-        await message.answer("Недостаточно прав.", reply_markup=menu_kb)
+        await message.answer("Недостаточно прав.")
         return
 
     if message.text == ADMIN_BACK_TO_APPOINTMENTS_BUTTON:
@@ -258,7 +258,7 @@ async def _handle_admin_appointment_action(
         return
 
     await state.clear()
-    await message.answer(admin_message, reply_markup=menu_kb)
+    await message.answer(admin_message, reply_markup=master_menu_kb)
 
 
 async def _send_client_notification(
@@ -316,7 +316,7 @@ async def _handle_common_navigation(
 ) -> bool:
     if message.text == MAIN_MENU_BUTTON:
         await state.clear()
-        await message.answer("Главное меню", reply_markup=menu_kb)
+        await message.answer("Главное меню", reply_markup=master_menu_kb)
         return True
 
     return False
