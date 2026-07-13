@@ -6,5 +6,9 @@ __pycache__/
 *.db
 logs/
 bot/logs/
+*.jpg
+*.jpeg
+*.png
 
 tasks.txt
+MANUAL_TEST_CHECKLIST.md
