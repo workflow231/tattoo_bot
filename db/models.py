@@ -245,3 +245,64 @@ class WeeklyDayOff(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+
+class WeeklyWorkingHours(Base):
+    __tablename__ = "weekly_working_hours"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    # 0 = Monday, 6 = Sunday
+    weekday: Mapped[int] = mapped_column(
+        Integer,
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+
+    start_time: Mapped[time] = mapped_column(Time, nullable=False)
+    end_time: Mapped[time] = mapped_column(Time, nullable=False)
+    slot_step_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class TemporaryWorkingHours(Base):
+    __tablename__ = "temporary_working_hours"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    date: Mapped[date] = mapped_column(
+        Date,
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+
+    start_time: Mapped[time] = mapped_column(Time, nullable=False)
+    end_time: Mapped[time] = mapped_column(Time, nullable=False)
+    slot_step_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )

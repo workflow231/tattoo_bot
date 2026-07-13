@@ -1,7 +1,7 @@
 from datetime import date
 
 from aiogram import F, Router
-from aiogram.exceptions import TelegramAPIError
+from aiogram.exceptions import TelegramAPIError, TelegramNetworkError
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -214,10 +214,18 @@ async def _handle_admin_calendar_day_action_callback(
         return True
 
     if action == "block_slot":
+        service = AdminCalendarService(session=session)
+        slot_texts = await service.get_blockable_slot_texts(
+            appointment_date=appointment_date,
+        )
         await state.set_state(AdminCalendarState.choosing_slot)
         await callback.message.edit_text(
-            "Выберите слот для блокировки:",
-            reply_markup=build_admin_slot_inline_keyboard(),
+            (
+                "Выберите слот для блокировки:"
+                if slot_texts
+                else "На эту дату рабочие слоты не заданы."
+            ),
+            reply_markup=build_admin_slot_inline_keyboard(slot_texts),
         )
         await callback.answer()
         return True
@@ -831,7 +839,7 @@ async def _send_client_notification(
 
     try:
         await message.bot.send_message(chat_id=chat_id, text=text)
-    except TelegramAPIError:
+    except (TelegramAPIError, TelegramNetworkError):
         return False
 
     return True

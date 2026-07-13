@@ -26,13 +26,13 @@ from db.repositories.schedule_repo import (
     remove_weekly_day_off,
 )
 from services.appointment_service import DATE_FORMAT, TIME_FORMAT, AppointmentService
+from services.working_hours_service import WorkingHoursService
 from utils.admin_calendar import (
     MONTH_NAMES,
     build_month_weeks,
     format_weekday_name,
     shift_month,
 )
-from utils.appointment_slots import DEFAULT_APPOINTMENT_TIMES
 
 
 @dataclass(frozen=True)
@@ -67,6 +67,7 @@ class AdminCalendarService:
     def __init__(self, session: AsyncSession):
         self.session = session
         self.appointment_formatter = AppointmentService(session=session)
+        self.working_hours = WorkingHoursService(session=session)
 
     async def get_month(self, year: int, month: int) -> AdminCalendarMonth:
         start_date = date(year, month, 1)
@@ -166,6 +167,9 @@ class AdminCalendarService:
             session=self.session,
             day=appointment_date,
         )
+        working_hours_text = await WorkingHoursService(
+            session=self.session,
+        ).get_day_rule_text(day=appointment_date)
         blocked_slot_texts = [
             blocked_slot.time_slot.strftime(TIME_FORMAT)
             for blocked_slot in blocked_slots
@@ -183,6 +187,7 @@ class AdminCalendarService:
             appointment_date.strftime(DATE_FORMAT),
             "",
             f"Заявок на день: {len(appointment_items)}",
+            working_hours_text,
         ]
 
         if temporary_day_off:
@@ -269,8 +274,11 @@ class AdminCalendarService:
         time_text: str,
     ) -> str | None:
         parsed_time = self.parse_time(time_text)
+        available_time_texts = await self.get_blockable_slot_texts(
+            appointment_date=appointment_date,
+        )
 
-        if not parsed_time or time_text not in DEFAULT_APPOINTMENT_TIMES:
+        if not parsed_time or time_text not in available_time_texts:
             return None
 
         await add_blocked_slot(
@@ -290,7 +298,7 @@ class AdminCalendarService:
     ) -> str | None:
         parsed_time = self.parse_time(time_text)
 
-        if not parsed_time or time_text not in DEFAULT_APPOINTMENT_TIMES:
+        if not parsed_time:
             return None
 
         removed = await remove_blocked_slot(
@@ -306,6 +314,9 @@ class AdminCalendarService:
             f"Блокировка слота {time_text} на "
             f"{appointment_date.strftime(DATE_FORMAT)} снята."
         )
+
+    async def get_blockable_slot_texts(self, appointment_date: date) -> list[str]:
+        return await self.working_hours.get_time_texts_for_date(appointment_date)
 
     def parse_time(self, value: str | None) -> time | None:
         if not value:

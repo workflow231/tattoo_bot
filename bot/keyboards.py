@@ -8,7 +8,6 @@ from aiogram.types import (
 )
 
 from db.models import Style, Sketch
-from utils.appointment_slots import DEFAULT_APPOINTMENT_TIMES
 
 BACK_BUTTON = "⬅️ Назад"
 MAIN_MENU_BUTTON = "🏠 Главное меню"
@@ -16,12 +15,23 @@ MAIN_MENU_BUTTON = "🏠 Главное меню"
 CREATE_REQUEST_BUTTON = "📝 Создать заявку"
 LEAVE_COMMENT_BUTTON = "💬 Оставить комментарий"
 CHAT_WITH_MASTER_BUTTON = "👨‍🎨 Чат с мастером"
+PREVIOUS_PAGE_BUTTON = "⬅️ Страница"
+NEXT_PAGE_BUTTON = "Страница ➡️"
+CATALOG_PAGE_SIZE = 10
 MY_APPOINTMENTS_BUTTON = "Мои заявки"
 CANCEL_APPOINTMENT_BUTTON = "Отменить заявку"
 ADMIN_APPOINTMENTS_BUTTON = "Заявки"
 ADD_SKETCH_BUTTON = "Добавить эскиз"
 CLIENT_CALENDAR_BUTTON = "Календарь"
 CALENDAR_BUTTON = "Календарь с записями"
+WORKING_HOURS_BUTTON = "Рабочее время"
+SHOW_WORKING_HOURS_RULES_BUTTON = "Показать правила"
+SET_WEEKLY_DAY_OFF_BUTTON = "Постоянный выходной"
+SET_WEEKLY_WORKING_HOURS_BUTTON = "Постоянные рабочие часы"
+REMOVE_WEEKLY_WORKING_HOURS_BUTTON = "Снять постоянные рабочие часы"
+SET_TEMPORARY_DAY_OFF_BUTTON = "Временный выходной"
+SET_TEMPORARY_WORKING_HOURS_BUTTON = "Временные рабочие часы"
+REMOVE_TEMPORARY_WORKING_HOURS_BUTTON = "Снять временные рабочие часы"
 ADMIN_PENDING_APPOINTMENTS_BUTTON = "Ждут подтверждения"
 ADMIN_CONFIRMED_APPOINTMENTS_BUTTON = "Подтверждённые"
 ADMIN_REJECTED_APPOINTMENTS_BUTTON = "Отклонённые"
@@ -86,11 +96,16 @@ def build_skip_back_main_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
-def build_styles_reply_keyboard(styles: list[Style]) -> ReplyKeyboardMarkup:
+def build_styles_reply_keyboard(
+    styles: list[Style],
+    page: int = 0,
+    page_size: int = CATALOG_PAGE_SIZE,
+) -> ReplyKeyboardMarkup:
     keyboard = []
+    page_items = _get_page_items(styles, page=page, page_size=page_size)
 
     row = []
-    for style in styles:
+    for style in page_items:
         row.append(KeyboardButton(text=style.name))
 
         if len(row) == 2:
@@ -100,6 +115,12 @@ def build_styles_reply_keyboard(styles: list[Style]) -> ReplyKeyboardMarkup:
     if row:
         keyboard.append(row)
 
+    _append_pagination_row(
+        keyboard=keyboard,
+        items_count=len(styles),
+        page=page,
+        page_size=page_size,
+    )
     keyboard.append([KeyboardButton(text=MAIN_MENU_BUTTON)])
 
     return ReplyKeyboardMarkup(
@@ -108,14 +129,25 @@ def build_styles_reply_keyboard(styles: list[Style]) -> ReplyKeyboardMarkup:
     )
 
 
-def build_sketches_reply_keyboard(sketches: list[Sketch]) -> ReplyKeyboardMarkup:
+def build_sketches_reply_keyboard(
+    sketches: list[Sketch],
+    page: int = 0,
+    page_size: int = CATALOG_PAGE_SIZE,
+) -> ReplyKeyboardMarkup:
     keyboard = []
+    page_items = _get_page_items(sketches, page=page, page_size=page_size)
 
-    for sketch in sketches:
+    for sketch in page_items:
         price = f" — от {sketch.price} ₽" if sketch.price else " — цена договорная"
 
         keyboard.append([KeyboardButton(text=f"{sketch.name}{price}")])
 
+    _append_pagination_row(
+        keyboard=keyboard,
+        items_count=len(sketches),
+        page=page,
+        page_size=page_size,
+    )
     keyboard.append(
         [
             KeyboardButton(text=BACK_BUTTON),
@@ -155,7 +187,7 @@ def build_appointment_calendar_keyboard(weeks: list[list[str]]) -> ReplyKeyboard
 
 
 def build_appointment_time_keyboard(
-    times: list[str] | tuple[str, ...] = DEFAULT_APPOINTMENT_TIMES,
+    times: list[str] | tuple[str, ...],
 ) -> ReplyKeyboardMarkup:
     keyboard = [[KeyboardButton(text=time_text)] for time_text in times]
     keyboard.append(
@@ -282,6 +314,50 @@ def build_admin_appointment_card_keyboard() -> ReplyKeyboardMarkup:
             [KeyboardButton(text=ADMIN_WRITE_CLIENT_BUTTON)],
             [
                 KeyboardButton(text=ADMIN_BACK_TO_APPOINTMENTS_BUTTON),
+                KeyboardButton(text=MAIN_MENU_BUTTON),
+            ],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def build_working_hours_actions_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=SHOW_WORKING_HOURS_RULES_BUTTON)],
+            [KeyboardButton(text=SET_WEEKLY_DAY_OFF_BUTTON)],
+            [KeyboardButton(text=SET_WEEKLY_WORKING_HOURS_BUTTON)],
+            [KeyboardButton(text=REMOVE_WEEKLY_WORKING_HOURS_BUTTON)],
+            [KeyboardButton(text=SET_TEMPORARY_DAY_OFF_BUTTON)],
+            [KeyboardButton(text=SET_TEMPORARY_WORKING_HOURS_BUTTON)],
+            [KeyboardButton(text=REMOVE_TEMPORARY_WORKING_HOURS_BUTTON)],
+            [
+                KeyboardButton(text=BACK_BUTTON),
+                KeyboardButton(text=MAIN_MENU_BUTTON),
+            ],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def build_weekday_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(text="Понедельник"),
+                KeyboardButton(text="Вторник"),
+            ],
+            [
+                KeyboardButton(text="Среда"),
+                KeyboardButton(text="Четверг"),
+            ],
+            [
+                KeyboardButton(text="Пятница"),
+                KeyboardButton(text="Суббота"),
+            ],
+            [KeyboardButton(text="Воскресенье")],
+            [
+                KeyboardButton(text=BACK_BUTTON),
                 KeyboardButton(text=MAIN_MENU_BUTTON),
             ],
         ],
@@ -497,7 +573,7 @@ def build_admin_day_off_type_inline_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def build_admin_slot_inline_keyboard() -> InlineKeyboardMarkup:
+def build_admin_slot_inline_keyboard(slot_texts: list[str]) -> InlineKeyboardMarkup:
     keyboard = [
         [
             InlineKeyboardButton(
@@ -508,7 +584,7 @@ def build_admin_slot_inline_keyboard() -> InlineKeyboardMarkup:
                 ),
             )
         ]
-        for time_text in DEFAULT_APPOINTMENT_TIMES
+        for time_text in slot_texts
     ]
     keyboard.append(
         [
@@ -664,7 +740,7 @@ master_menu_kb = ReplyKeyboardMarkup(
             KeyboardButton(text=ADD_SKETCH_BUTTON),
         ],
         [
-            KeyboardButton(text=CHAT_WITH_MASTER_BUTTON),
+            KeyboardButton(text=WORKING_HOURS_BUTTON),
         ],
     ],
     resize_keyboard=True,
@@ -684,3 +760,29 @@ def _extract_day_number(day_text: str) -> int | None:
         return None
 
     return int(day_number_text)
+
+
+def _get_page_items(items, page: int, page_size: int):
+    start = page * page_size
+    return items[start : start + page_size]
+
+
+def _append_pagination_row(
+    keyboard: list,
+    items_count: int,
+    page: int,
+    page_size: int,
+) -> None:
+    if items_count <= page_size:
+        return
+
+    row = []
+
+    if page > 0:
+        row.append(KeyboardButton(text=PREVIOUS_PAGE_BUTTON))
+
+    if (page + 1) * page_size < items_count:
+        row.append(KeyboardButton(text=NEXT_PAGE_BUTTON))
+
+    if row:
+        keyboard.append(row)

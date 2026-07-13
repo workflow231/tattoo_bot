@@ -38,6 +38,15 @@ class AdminCalendarState(StatesGroup):
     viewing_appointment = State()
 
 
+class AdminWorkingHoursState(StatesGroup):
+    choosing_action = State()
+    choosing_weekday = State()
+    waiting_date = State()
+    waiting_start_time = State()
+    waiting_end_time = State()
+    waiting_slot_step = State()
+
+
 class AdminSketchState(StatesGroup):
     choosing_style = State()
     waiting_new_style_name = State()

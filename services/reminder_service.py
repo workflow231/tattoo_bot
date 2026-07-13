@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 
 from aiogram import Bot
-from aiogram.exceptions import TelegramAPIError
+from aiogram.exceptions import TelegramAPIError, TelegramNetworkError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Appointment
@@ -51,7 +51,7 @@ class ReminderService:
                 chat_id=appointment.user.telegram_id,
                 text=self.build_reminder_text(appointment=appointment),
             )
-        except TelegramAPIError:
+        except (TelegramAPIError, TelegramNetworkError):
             return False
 
         return True

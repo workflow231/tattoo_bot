@@ -19,6 +19,18 @@ def get_bool_env(name: str, default: bool = False) -> bool:
     return raw_value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def get_int_env(name: str, default: int) -> int:
+    raw_value = os.getenv(name)
+
+    if raw_value is None or not raw_value.strip():
+        return default
+
+    try:
+        return int(raw_value)
+    except ValueError as exc:
+        raise RuntimeError(f"{name} must be an integer") from exc
+
+
 def get_admin_ids_from_env() -> set[int]:
     values = []
     admin_ids = os.getenv("ADMIN_IDS")

@@ -38,14 +38,10 @@ def build_month_weeks(
     day_off_dates = day_off_dates or set()
     blocked_slot_dates = blocked_slot_dates or set()
 
-    for week in Calendar(firstweekday=0).monthdatescalendar(year, month):
+    for week in iter_month_weeks(year=year, month=month):
         week_buttons = []
 
         for day in week:
-            if day.month != month:
-                week_buttons.append(" ")
-                continue
-
             appointment_count = counts_by_day.get(day, 0)
             label = str(day.day)
 
@@ -63,6 +59,13 @@ def build_month_weeks(
         weeks.append(week_buttons)
 
     return weeks
+
+
+def iter_month_weeks(year: int, month: int) -> list[list[date]]:
+    return [
+        [day for day in week if day.month == month]
+        for week in Calendar(firstweekday=0).monthdatescalendar(year, month)
+    ]
 
 
 def shift_month(year: int, month: int, step: int) -> tuple[int, int]:

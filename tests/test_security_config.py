@@ -1,6 +1,12 @@
 import pytest
 
-from utils.config import get_admin_ids_from_env, get_bool_env, get_required_env
+from bot.main import _get_webhook_path
+from utils.config import (
+    get_admin_ids_from_env,
+    get_bool_env,
+    get_int_env,
+    get_required_env,
+)
 
 
 def test_get_required_env_raises_without_value(monkeypatch) -> None:
@@ -26,6 +32,26 @@ def test_sql_echo_accepts_explicit_truthy_values(monkeypatch) -> None:
     monkeypatch.setenv("SQL_ECHO", "true")
 
     assert get_bool_env("SQL_ECHO", default=False) is True
+
+
+def test_get_int_env_rejects_non_integer(monkeypatch) -> None:
+    monkeypatch.setenv("WEBHOOK_PORT", "not-a-port")
+
+    with pytest.raises(RuntimeError, match="WEBHOOK_PORT must be an integer"):
+        get_int_env("WEBHOOK_PORT", 8080)
+
+
+def test_webhook_path_must_start_with_slash(monkeypatch) -> None:
+    monkeypatch.setenv("WEBHOOK_PATH", "webhook")
+
+    with pytest.raises(RuntimeError, match="WEBHOOK_PATH must start with /"):
+        _get_webhook_path()
+
+
+def test_webhook_path_defaults_to_webhook(monkeypatch) -> None:
+    monkeypatch.delenv("WEBHOOK_PATH", raising=False)
+
+    assert _get_webhook_path() == "/webhook"
 
 
 def test_user_service_admin_ids_parse_list_and_ignore_invalid_values(

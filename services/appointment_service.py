@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from calendar import monthrange
 from dataclasses import dataclass
 from datetime import date, datetime, time
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Appointment, Sketch, User
@@ -11,7 +11,7 @@ from db.repositories.appointment_repo import (
     change_appointment_status,
     create_appointment,
     find_user_appointment_by_id,
-    list_confirmed_times_for_date,
+    list_busy_times_for_date,
     list_user_appointments,
 )
 from db.repositories.schedule_repo import (
@@ -21,8 +21,8 @@ from db.repositories.schedule_repo import (
 )
 from db.repositories.sketch_repo import get_sketch_by_id_with_style
 from db.repositories.user_repo import get_user_by_telegram_id
-from utils.appointment_slots import DEFAULT_APPOINTMENT_TIMES
-from utils.admin_calendar import MONTH_NAMES, shift_month
+from utils.admin_calendar import MONTH_NAMES, iter_month_weeks, shift_month
+from services.working_hours_service import WorkingHoursService
 
 DATE_FORMAT = "%d.%m.%Y"
 TIME_FORMAT = "%H:%M"
@@ -96,15 +96,18 @@ class AppointmentService:
         if not slot_is_available:
             return None
 
-        return await create_appointment(
-            session=self.session,
-            user_id=user.id,
-            sketch_id=sketch.id,
-            appointment_date=draft.appointment_date,
-            appointment_time=draft.appointment_time,
-            client_comment=draft.comment,
-            status="pending",
-        )
+        try:
+            return await create_appointment(
+                session=self.session,
+                user_id=user.id,
+                sketch_id=sketch.id,
+                appointment_date=draft.appointment_date,
+                appointment_time=draft.appointment_time,
+                client_comment=draft.comment,
+                status="pending",
+            )
+        except IntegrityError:
+            return None
 
     async def get_available_time_texts(
         self,
@@ -113,7 +116,7 @@ class AppointmentService:
         if await self.is_date_unavailable(appointment_date=appointment_date):
             return []
 
-        busy_times = await list_confirmed_times_for_date(
+        busy_times = await list_busy_times_for_date(
             session=self.session,
             appointment_date=appointment_date,
         )
@@ -122,9 +125,15 @@ class AppointmentService:
             appointment_date=appointment_date,
         )
 
+        time_texts = await WorkingHoursService(
+            session=self.session
+        ).get_time_texts_for_date(
+            day=appointment_date,
+        )
+
         return [
             time_text
-            for time_text in DEFAULT_APPOINTMENT_TIMES
+            for time_text in time_texts
             if time_text not in busy_time_texts and time_text not in blocked_time_texts
         ]
 
@@ -209,36 +218,31 @@ class AppointmentService:
         year: int,
         month: int,
     ) -> AppointmentCalendarMonth:
-        _, last_day = monthrange(year, month)
         available_dates = {}
         weeks = []
-        week = []
         previous_year, previous_month = shift_month(year=year, month=month, step=-1)
         next_year, next_month = shift_month(year=year, month=month, step=1)
 
-        for day_number in range(1, last_day + 1):
-            current_date = date(year, month, day_number)
-            label = str(day_number)
+        for month_week in iter_month_weeks(year=year, month=month):
+            week = []
 
-            if current_date < date.today():
-                label = f"{label} ×"
-            else:
-                available_times = await self.get_available_time_texts(
-                    appointment_date=current_date,
-                )
+            for current_date in month_week:
+                label = str(current_date.day)
 
-                if available_times:
-                    available_dates[label] = current_date.isoformat()
-                else:
+                if current_date < date.today():
                     label = f"{label} ×"
+                else:
+                    available_times = await self.get_available_time_texts(
+                        appointment_date=current_date,
+                    )
 
-            week.append(label)
+                    if available_times:
+                        available_dates[label] = current_date.isoformat()
+                    else:
+                        label = f"{label} ×"
 
-            if len(week) == 7:
-                weeks.append(week)
-                week = []
+                week.append(label)
 
-        if week:
             weeks.append(week)
 
         return AppointmentCalendarMonth(

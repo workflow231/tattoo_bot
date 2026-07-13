@@ -1,5 +1,5 @@
 from aiogram import F, Router
-from aiogram.exceptions import TelegramAPIError
+from aiogram.exceptions import TelegramAPIError, TelegramNetworkError
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -271,7 +271,7 @@ async def _send_client_notification(
 
     try:
         await message.bot.send_message(chat_id=chat_id, text=text)
-    except TelegramAPIError:
+    except (TelegramAPIError, TelegramNetworkError):
         return False
 
     return True

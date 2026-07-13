@@ -3,7 +3,12 @@ from datetime import date, time
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import ScheduleException, WeeklyDayOff
+from db.models import (
+    ScheduleException,
+    TemporaryWorkingHours,
+    WeeklyDayOff,
+    WeeklyWorkingHours,
+)
 
 TEMPORARY_DAY_OFF_TYPE = "temporary_day_off"
 BLOCKED_SLOT_TYPE = "blocked_slot"
@@ -88,7 +93,7 @@ async def find_weekly_day_off(
 async def list_weekly_day_offs(
     session: AsyncSession,
 ) -> list[WeeklyDayOff]:
-    result = await session.execute(select(WeeklyDayOff))
+    result = await session.execute(select(WeeklyDayOff).order_by(WeeklyDayOff.weekday))
     return list(result.scalars().all())
 
 
@@ -219,5 +224,137 @@ async def remove_blocked_slot(
         return False
 
     await session.delete(existing_slot)
+    await session.commit()
+    return True
+
+
+async def find_weekly_working_hours(
+    session: AsyncSession,
+    weekday: int,
+) -> WeeklyWorkingHours | None:
+    result = await session.execute(
+        select(WeeklyWorkingHours).where(WeeklyWorkingHours.weekday == weekday)
+    )
+    return result.scalar_one_or_none()
+
+
+async def list_weekly_working_hours(
+    session: AsyncSession,
+) -> list[WeeklyWorkingHours]:
+    result = await session.execute(
+        select(WeeklyWorkingHours).order_by(WeeklyWorkingHours.weekday)
+    )
+    return list(result.scalars().all())
+
+
+async def upsert_weekly_working_hours(
+    session: AsyncSession,
+    weekday: int,
+    start_time: time,
+    end_time: time,
+    slot_step_minutes: int,
+) -> WeeklyWorkingHours:
+    working_hours = await find_weekly_working_hours(
+        session=session,
+        weekday=weekday,
+    )
+
+    if working_hours:
+        working_hours.start_time = start_time
+        working_hours.end_time = end_time
+        working_hours.slot_step_minutes = slot_step_minutes
+    else:
+        working_hours = WeeklyWorkingHours(
+            weekday=weekday,
+            start_time=start_time,
+            end_time=end_time,
+            slot_step_minutes=slot_step_minutes,
+        )
+        session.add(working_hours)
+
+    await session.commit()
+    await session.refresh(working_hours)
+    return working_hours
+
+
+async def remove_weekly_working_hours(
+    session: AsyncSession,
+    weekday: int,
+) -> bool:
+    working_hours = await find_weekly_working_hours(
+        session=session,
+        weekday=weekday,
+    )
+
+    if not working_hours:
+        return False
+
+    await session.delete(working_hours)
+    await session.commit()
+    return True
+
+
+async def find_temporary_working_hours(
+    session: AsyncSession,
+    day: date,
+) -> TemporaryWorkingHours | None:
+    result = await session.execute(
+        select(TemporaryWorkingHours).where(TemporaryWorkingHours.date == day)
+    )
+    return result.scalar_one_or_none()
+
+
+async def list_temporary_working_hours(
+    session: AsyncSession,
+) -> list[TemporaryWorkingHours]:
+    result = await session.execute(
+        select(TemporaryWorkingHours).order_by(TemporaryWorkingHours.date)
+    )
+    return list(result.scalars().all())
+
+
+async def upsert_temporary_working_hours(
+    session: AsyncSession,
+    day: date,
+    start_time: time,
+    end_time: time,
+    slot_step_minutes: int,
+) -> TemporaryWorkingHours:
+    working_hours = await find_temporary_working_hours(
+        session=session,
+        day=day,
+    )
+
+    if working_hours:
+        working_hours.start_time = start_time
+        working_hours.end_time = end_time
+        working_hours.slot_step_minutes = slot_step_minutes
+    else:
+        working_hours = TemporaryWorkingHours(
+            date=day,
+            start_time=start_time,
+            end_time=end_time,
+            slot_step_minutes=slot_step_minutes,
+        )
+        session.add(working_hours)
+
+    await session.commit()
+    await session.refresh(working_hours)
+    return working_hours
+
+
+async def remove_temporary_working_hours(
+    session: AsyncSession,
+    day: date,
+) -> bool:
+    working_hours = await find_temporary_working_hours(
+        session=session,
+        day=day,
+    )
+
+    if not working_hours:
+        return False
+
+    await session.delete(working_hours)
     await session.commit()
     return True

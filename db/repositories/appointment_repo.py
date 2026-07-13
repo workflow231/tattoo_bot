@@ -7,6 +7,8 @@ from sqlalchemy.orm import selectinload
 
 from db.models import Appointment
 
+BUSY_APPOINTMENT_STATUSES = ("pending", "confirmed")
+
 
 async def create_appointment(
     session: AsyncSession,
@@ -30,7 +32,13 @@ async def create_appointment(
     )
 
     session.add(appointment)
-    await session.commit()
+
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise
+
     await session.refresh(appointment)
 
     return appointment
@@ -139,6 +147,19 @@ async def list_confirmed_times_for_date(
     return list(result.scalars().all())
 
 
+async def list_busy_times_for_date(
+    session: AsyncSession,
+    appointment_date: date,
+) -> list[time]:
+    result = await session.execute(
+        select(Appointment.appointment_time).where(
+            Appointment.appointment_date == appointment_date,
+            Appointment.status.in_(BUSY_APPOINTMENT_STATUSES),
+        )
+    )
+    return list(result.scalars().all())
+
+
 async def count_appointments_by_day(
     session: AsyncSession,
     start_date: date,
@@ -152,7 +173,7 @@ async def count_appointments_by_day(
         .where(
             Appointment.appointment_date >= start_date,
             Appointment.appointment_date <= end_date,
-            Appointment.status.in_(("pending", "confirmed")),
+            Appointment.status.in_(BUSY_APPOINTMENT_STATUSES),
         )
         .group_by(Appointment.appointment_date)
     )
@@ -174,7 +195,7 @@ async def list_appointments_for_day(
         )
         .where(
             Appointment.appointment_date == appointment_date,
-            Appointment.status.in_(("pending", "confirmed")),
+            Appointment.status.in_(BUSY_APPOINTMENT_STATUSES),
         )
         .order_by(Appointment.appointment_time.asc())
     )
