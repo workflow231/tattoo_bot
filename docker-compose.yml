@@ -1,25 +1,69 @@
 services:
+  tailscale:
+    image: tailscale/tailscale:v1.98.8
+    entrypoint: /bin/sh
+    hostname: ${TAILSCALE_HOSTNAME:-tattoo-bot}
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true"
+      TS_ACCEPT_DNS: "false"
+      TAILSCALE_HOSTNAME: ${TAILSCALE_HOSTNAME:-tattoo-bot}
+      WEBHOOK_PORT: ${WEBHOOK_PORT:-8080}
+    volumes:
+      - tailscale_state:/var/lib/tailscale
+    command:
+      - -c
+      - |
+        tailscaled --tun=userspace-networking --state=/var/lib/tailscale/tailscaled.state &
+        until tailscale status --peers=false >/dev/null 2>&1; do
+          tailscale up --authkey="$${TS_AUTHKEY}" --hostname="$${TAILSCALE_HOSTNAME}" --accept-dns=false || true
+          sleep 2
+        done
+        while true; do
+          tailscale serve --bg --http=80 "http://bot:$${WEBHOOK_PORT}" &&
+          tailscale funnel --bg "http://bot:$${WEBHOOK_PORT}" &&
+          sleep infinity
+          sleep 2
+        done
+    healthcheck:
+      test: ["CMD", "tailscale", "status", "--peers=false"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
   bot:
     build:
       context: .
     command: sh -c "alembic upgrade head && python -m bot.main"
     environment:
       BOT_TOKEN: ${BOT_TOKEN:-}
+      BOT_MODE: ${BOT_MODE:-webhook}
       DB_PATH: ${DB_PATH:-/app/data/tattoo_bot.db}
       ADMIN_ID: ${ADMIN_ID:-}
       ADMIN_IDS: ${ADMIN_IDS:-}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       SQL_ECHO: ${SQL_ECHO:-false}
       MASTER_CONTACT: ${MASTER_CONTACT:-}
+      WEBHOOK_URL: ${WEBHOOK_URL:-}
+      WEBHOOK_PATH: ${WEBHOOK_PATH:-/webhook}
+      WEBHOOK_SECRET_TOKEN: ${WEBHOOK_SECRET_TOKEN:-}
+      WEBHOOK_HOST: ${WEBHOOK_HOST:-0.0.0.0}
+      WEBHOOK_PORT: ${WEBHOOK_PORT:-8080}
     volumes:
       - tattoo_bot_data:/app/data
+    expose:
+      - "${WEBHOOK_PORT:-8080}"
     depends_on:
+      tailscale:
+        condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4.8-alpine
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
@@ -33,3 +77,4 @@ services:
 volumes:
   tattoo_bot_data:
   redis_data:
+  tailscale_state:

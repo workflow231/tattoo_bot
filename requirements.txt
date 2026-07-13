@@ -1,7 +1,7 @@
-aiogram
-aiosqlite
-alembic
-APScheduler
-python-dotenv
-redis
-SQLAlchemy
+aiogram==3.29.1
+aiosqlite==0.22.1
+alembic==1.18.5
+APScheduler==3.11.3
+python-dotenv==1.2.2
+redis==8.0.1
+SQLAlchemy==2.0.51
