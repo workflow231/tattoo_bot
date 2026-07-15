@@ -1,38 +1,4 @@
 services:
-  tailscale:
-    image: tailscale/tailscale:v1.98.8
-    entrypoint: /bin/sh
-    hostname: ${TAILSCALE_HOSTNAME:-tattoo-bot}
-    environment:
-      TS_AUTHKEY: ${TS_AUTHKEY:-}
-      TS_STATE_DIR: /var/lib/tailscale
-      TS_USERSPACE: "true"
-      TS_ACCEPT_DNS: "false"
-      TAILSCALE_HOSTNAME: ${TAILSCALE_HOSTNAME:-tattoo-bot}
-      WEBHOOK_PORT: ${WEBHOOK_PORT:-8080}
-    volumes:
-      - tailscale_state:/var/lib/tailscale
-    command:
-      - -c
-      - |
-        tailscaled --tun=userspace-networking --state=/var/lib/tailscale/tailscaled.state &
-        until tailscale status --peers=false >/dev/null 2>&1; do
-          tailscale up --authkey="$${TS_AUTHKEY}" --hostname="$${TAILSCALE_HOSTNAME}" --accept-dns=false || true
-          sleep 2
-        done
-        while true; do
-          tailscale serve --bg --http=80 "http://bot:$${WEBHOOK_PORT}" &&
-          tailscale funnel --bg "http://bot:$${WEBHOOK_PORT}" &&
-          sleep infinity
-          sleep 2
-        done
-    healthcheck:
-      test: ["CMD", "tailscale", "status", "--peers=false"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-    restart: unless-stopped
-
   bot:
     build:
       context: .
@@ -56,8 +22,6 @@ services:
     expose:
       - "${WEBHOOK_PORT:-8080}"
     depends_on:
-      tailscale:
-        condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
@@ -77,4 +41,3 @@ services:
 volumes:
   tattoo_bot_data:
   redis_data:
-  tailscale_state:
