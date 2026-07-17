@@ -13,6 +13,7 @@ from db.repositories.sketch_repo import (
     find_viewed_sketch_photo_in_style,
     get_available_sketches_by_style_id,
     get_sketch_by_id_with_style,
+    increment_sketch_views,
 )
 
 
@@ -31,10 +32,21 @@ class SketchCatalogService:
         )
 
     async def get_sketch_by_id(self, sketch_id: int) -> Sketch | None:
-        return await get_sketch_by_id_with_style(
+        sketch = await get_sketch_by_id_with_style(
             session=self.session,
             sketch_id=sketch_id,
         )
+
+        if not sketch or sketch.status != "available" or not sketch.photo_file_id:
+            return None
+
+        await increment_sketch_views(
+            session=self.session,
+            sketch_id=sketch.id,
+        )
+        sketch.views += 1
+
+        return sketch
 
     async def send_styles_catalog(
         self,

@@ -1,8 +1,8 @@
-from sqlalchemy import select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import Sketch
+from db.models import Appointment, Sketch
 
 
 async def get_available_sketches_by_style_id(
@@ -23,6 +23,16 @@ async def get_available_sketches_by_style_id(
     return list(result.scalars().all())
 
 
+async def get_all_sketches_with_style(session: AsyncSession) -> list[Sketch]:
+    stmt = (
+        select(Sketch)
+        .options(selectinload(Sketch.style))
+        .order_by(Sketch.created_at.desc(), Sketch.id.desc())
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
 async def get_sketch_by_id_with_style(
     session: AsyncSession,
     sketch_id: int,
@@ -33,6 +43,26 @@ async def get_sketch_by_id_with_style(
 
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def count_appointments_by_sketch_id(
+    session: AsyncSession,
+    sketch_id: int,
+) -> int:
+    result = await session.execute(
+        select(func.count(Appointment.id)).where(Appointment.sketch_id == sketch_id)
+    )
+    return int(result.scalar_one())
+
+
+async def increment_sketch_views(
+    session: AsyncSession,
+    sketch_id: int,
+) -> None:
+    await session.execute(
+        update(Sketch).where(Sketch.id == sketch_id).values(views=Sketch.views + 1)
+    )
+    await session.commit()
 
 
 async def find_viewed_sketch_photo_in_style(
@@ -79,3 +109,26 @@ async def create_sketch(
     await session.refresh(sketch)
 
     return sketch
+
+
+async def update_sketch(
+    session: AsyncSession,
+    sketch_id: int,
+    **fields,
+) -> Sketch | None:
+    sketch = await get_sketch_by_id_with_style(session=session, sketch_id=sketch_id)
+
+    if not sketch:
+        return None
+
+    for field_name, field_value in fields.items():
+        setattr(sketch, field_name, field_value)
+
+    await session.commit()
+    return await get_sketch_by_id_with_style(session=session, sketch_id=sketch.id)
+
+
+async def delete_sketch(session: AsyncSession, sketch_id: int) -> bool:
+    result = await session.execute(delete(Sketch).where(Sketch.id == sketch_id))
+    await session.commit()
+    return bool(result.rowcount)
