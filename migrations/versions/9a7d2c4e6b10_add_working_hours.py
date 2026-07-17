@@ -41,12 +41,14 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.PrimaryKeyConstraint("id"),
+        if_not_exists=True,
     )
     op.create_index(
         op.f("ix_weekly_working_hours_weekday"),
         "weekly_working_hours",
         ["weekday"],
         unique=True,
+        if_not_exists=True,
     )
     op.create_table(
         "temporary_working_hours",
@@ -68,12 +70,14 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.PrimaryKeyConstraint("id"),
+        if_not_exists=True,
     )
     op.create_index(
         op.f("ix_temporary_working_hours_date"),
         "temporary_working_hours",
         ["date"],
         unique=True,
+        if_not_exists=True,
     )
 
 

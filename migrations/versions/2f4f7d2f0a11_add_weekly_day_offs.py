@@ -37,12 +37,14 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.PrimaryKeyConstraint("id"),
+        if_not_exists=True,
     )
     op.create_index(
         op.f("ix_weekly_day_offs_weekday"),
         "weekly_day_offs",
         ["weekday"],
         unique=True,
+        if_not_exists=True,
     )
 
 
