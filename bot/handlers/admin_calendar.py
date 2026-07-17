@@ -28,6 +28,7 @@ from services.admin_appointment_service import AdminAppointmentService
 from services.admin_calendar_service import AdminCalendarService
 
 router = Router()
+STALE_ADMIN_CALENDAR_TEXT = "Сессия календаря устарела. Откройте календарь заново."
 
 
 @router.callback_query(F.data == ADMIN_CALENDAR_IGNORE_CALLBACK)
@@ -137,6 +138,10 @@ async def _handle_admin_calendar_navigation_callback(
 
     appointment_date = await _get_state_admin_calendar_date(state=state)
 
+    if action in {"back_month", "back_day"} and not appointment_date:
+        await callback.answer(STALE_ADMIN_CALENDAR_TEXT, show_alert=True)
+        return True
+
     if action == "back_month" and appointment_date:
         await _edit_admin_calendar_month(
             session=session,
@@ -181,7 +186,7 @@ async def _handle_admin_calendar_day_action_callback(
         }
         and not appointment_date
     ):
-        await callback.answer("Дата не выбрана.", show_alert=True)
+        await callback.answer(STALE_ADMIN_CALENDAR_TEXT, show_alert=True)
         return True
 
     if action == "add_day_off":

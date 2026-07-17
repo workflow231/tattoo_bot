@@ -1,5 +1,6 @@
 from aiogram import Router
 from aiogram.filters import CommandStart
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from services.user_service import UserService
@@ -13,7 +14,9 @@ router = Router()
 
 
 @router.message(CommandStart())
-async def cmd_start(message: Message):
+async def cmd_start(message: Message, state: FSMContext):
+    await state.clear()
+
     telegram_id = message.from_user.id
     username = message.from_user.username
 

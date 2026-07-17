@@ -3,11 +3,13 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.keyboards import CHAT_WITH_MASTER_BUTTON
+from bot.keyboards import BACK_BUTTON, CHAT_WITH_MASTER_BUTTON, MAIN_MENU_BUTTON
 from bot.menu_utils import get_main_menu_for_message
 from services.master_contact_service import MasterContactService
 
 router = Router()
+
+STALE_SESSION_TEXT = "Сессия устарела. Откройте нужный раздел заново."
 
 
 @router.message(F.text == CHAT_WITH_MASTER_BUTTON)
@@ -19,5 +21,32 @@ async def show_master_contact(
     await state.clear()
     await message.answer(
         MasterContactService().get_contact_text(),
+        reply_markup=get_main_menu_for_message(session=session, message=message),
+    )
+
+
+@router.message(F.text == MAIN_MENU_BUTTON)
+async def show_main_menu(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    await state.clear()
+    await message.answer(
+        "Главное меню",
+        reply_markup=get_main_menu_for_message(session=session, message=message),
+    )
+
+
+@router.message()
+async def handle_stale_reply_keyboard(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    await state.clear()
+    text = "Главное меню" if message.text == BACK_BUTTON else STALE_SESSION_TEXT
+    await message.answer(
+        text,
         reply_markup=get_main_menu_for_message(session=session, message=message),
     )
