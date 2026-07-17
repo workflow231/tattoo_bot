@@ -13,7 +13,6 @@ BACK_BUTTON = "⬅️ Назад"
 MAIN_MENU_BUTTON = "🏠 Главное меню"
 
 CREATE_REQUEST_BUTTON = "📝 Создать заявку"
-LEAVE_COMMENT_BUTTON = "💬 Оставить комментарий"
 CHAT_WITH_MASTER_BUTTON = "👨‍🎨 Чат с мастером"
 PREVIOUS_PAGE_BUTTON = "⬅️ Страница"
 NEXT_PAGE_BUTTON = "Страница ➡️"
@@ -21,7 +20,12 @@ CATALOG_PAGE_SIZE = 10
 MY_APPOINTMENTS_BUTTON = "Мои заявки"
 CANCEL_APPOINTMENT_BUTTON = "Отменить заявку"
 ADMIN_APPOINTMENTS_BUTTON = "Заявки"
+ADMIN_SKETCHES_BUTTON = "Эскизы"
 ADD_SKETCH_BUTTON = "Добавить эскиз"
+DELETE_STYLE_BUTTON = "Удалить стиль"
+EDIT_STYLE_BUTTON = "Изменить стиль"
+DELETE_SKETCH_BUTTON = "Удалить эскиз"
+EDIT_SKETCH_BUTTON = "Изменить эскиз"
 CLIENT_CALENDAR_BUTTON = "Календарь"
 CALENDAR_BUTTON = "Календарь с записями"
 WORKING_HOURS_BUTTON = "Рабочее время"
@@ -56,6 +60,8 @@ ADMIN_REMOVE_BLOCKED_SLOT_PREFIX = "Снять блокировку"
 SKIP_COMMENT_BUTTON = "Пропустить"
 CONFIRM_CREATE_REQUEST_BUTTON = "Создать заявку"
 CONFIRM_CREATE_SKETCH_BUTTON = "Сохранить эскиз"
+CONFIRM_DELETE_STYLE_BUTTON = "Удалить стиль точно"
+CONFIRM_DELETE_SKETCH_BUTTON = "Удалить эскиз точно"
 CHANGE_DATE_BUTTON = "Изменить дату"
 CHANGE_TIME_BUTTON = "Изменить время"
 CHANGE_COMMENT_BUTTON = "Изменить комментарий"
@@ -64,6 +70,12 @@ CREATE_STYLE_BUTTON = "Создать новый стиль"
 AVAILABLE_STATUS_BUTTON = "Доступен"
 RESERVED_STATUS_BUTTON = "Зарезервирован"
 HIDDEN_STATUS_BUTTON = "Скрыт"
+EDIT_SKETCH_NAME_BUTTON = "Название"
+EDIT_SKETCH_DESCRIPTION_BUTTON = "Описание"
+EDIT_SKETCH_PRICE_BUTTON = "Цена"
+EDIT_SKETCH_PHOTO_BUTTON = "Фото"
+EDIT_SKETCH_STATUS_BUTTON = "Статус"
+EDIT_SKETCH_STYLE_BUTTON = "Стиль"
 
 ADMIN_CALENDAR_CALLBACK_PREFIX = "admcal"
 CLIENT_CALENDAR_CALLBACK_PREFIX = "clical"
@@ -638,6 +650,122 @@ def build_admin_sketch_style_keyboard(styles: list[Style]) -> ReplyKeyboardMarku
     return build_admin_sketch_style_names_keyboard([style.name for style in styles])
 
 
+def build_admin_sketch_actions_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=ADD_SKETCH_BUTTON)],
+            [
+                KeyboardButton(text=DELETE_STYLE_BUTTON),
+                KeyboardButton(text=EDIT_STYLE_BUTTON),
+            ],
+            [
+                KeyboardButton(text=DELETE_SKETCH_BUTTON),
+                KeyboardButton(text=EDIT_SKETCH_BUTTON),
+            ],
+            [
+                KeyboardButton(text=BACK_BUTTON),
+                KeyboardButton(text=MAIN_MENU_BUTTON),
+            ],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def build_admin_style_select_keyboard(
+    styles: list[Style],
+    page: int = 0,
+    page_size: int = CATALOG_PAGE_SIZE,
+) -> ReplyKeyboardMarkup:
+    keyboard = []
+    row = []
+
+    for style in _get_page_items(styles, page=page, page_size=page_size):
+        row.append(KeyboardButton(text=style.name))
+
+        if len(row) == 2:
+            keyboard.append(row)
+            row = []
+
+    if row:
+        keyboard.append(row)
+
+    _append_pagination_row(
+        keyboard=keyboard,
+        items_count=len(styles),
+        page=page,
+        page_size=page_size,
+    )
+    keyboard.append(
+        [KeyboardButton(text=BACK_BUTTON), KeyboardButton(text=MAIN_MENU_BUTTON)]
+    )
+
+    return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
+
+
+def build_admin_sketch_select_keyboard(
+    sketches: list[Sketch],
+    page: int = 0,
+    page_size: int = CATALOG_PAGE_SIZE,
+) -> ReplyKeyboardMarkup:
+    keyboard = [
+        [KeyboardButton(text=format_admin_sketch_button_text(sketch))]
+        for sketch in _get_page_items(sketches, page=page, page_size=page_size)
+    ]
+
+    _append_pagination_row(
+        keyboard=keyboard,
+        items_count=len(sketches),
+        page=page,
+        page_size=page_size,
+    )
+    keyboard.append(
+        [KeyboardButton(text=BACK_BUTTON), KeyboardButton(text=MAIN_MENU_BUTTON)]
+    )
+
+    return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
+
+
+def build_admin_sketch_edit_fields_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(text=EDIT_SKETCH_NAME_BUTTON),
+                KeyboardButton(text=EDIT_SKETCH_DESCRIPTION_BUTTON),
+            ],
+            [
+                KeyboardButton(text=EDIT_SKETCH_PRICE_BUTTON),
+                KeyboardButton(text=EDIT_SKETCH_PHOTO_BUTTON),
+            ],
+            [
+                KeyboardButton(text=EDIT_SKETCH_STATUS_BUTTON),
+                KeyboardButton(text=EDIT_SKETCH_STYLE_BUTTON),
+            ],
+            [
+                KeyboardButton(text=BACK_BUTTON),
+                KeyboardButton(text=MAIN_MENU_BUTTON),
+            ],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def build_admin_delete_confirm_keyboard(confirm_button: str) -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=confirm_button)],
+            [
+                KeyboardButton(text=BACK_BUTTON),
+                KeyboardButton(text=MAIN_MENU_BUTTON),
+            ],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def format_admin_sketch_button_text(sketch: Sketch) -> str:
+    return f"#{sketch.id} {sketch.name}"
+
+
 def build_admin_sketch_style_names_keyboard(
     style_names: list[str],
 ) -> ReplyKeyboardMarkup:
@@ -703,7 +831,6 @@ def build_admin_sketch_confirm_keyboard() -> ReplyKeyboardMarkup:
 sketch_card_kb = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text=CREATE_REQUEST_BUTTON)],
-        [KeyboardButton(text=LEAVE_COMMENT_BUTTON)],
         [KeyboardButton(text=CHAT_WITH_MASTER_BUTTON)],
         [
             KeyboardButton(text=BACK_BUTTON),
@@ -737,7 +864,7 @@ master_menu_kb = ReplyKeyboardMarkup(
         ],
         [
             KeyboardButton(text=ADMIN_APPOINTMENTS_BUTTON),
-            KeyboardButton(text=ADD_SKETCH_BUTTON),
+            KeyboardButton(text=ADMIN_SKETCHES_BUTTON),
         ],
         [
             KeyboardButton(text=WORKING_HOURS_BUTTON),

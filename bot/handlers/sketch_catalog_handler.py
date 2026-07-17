@@ -7,7 +7,6 @@ from bot.keyboards import (
     BACK_BUTTON,
     CATALOG_PAGE_SIZE,
     CHAT_WITH_MASTER_BUTTON,
-    LEAVE_COMMENT_BUTTON,
     MAIN_MENU_BUTTON,
     NEXT_PAGE_BUTTON,
     PREVIOUS_PAGE_BUTTON,
@@ -244,15 +243,6 @@ async def sketch_selected_actions(
     if message.text == CHAT_WITH_MASTER_BUTTON:
         await message.answer(
             MasterContactService().get_contact_text(),
-            reply_markup=sketch_card_kb,
-        )
-        return
-
-    if message.text == LEAVE_COMMENT_BUTTON:
-        await message.answer(
-            "Комментарий можно оставить при создании заявки.\n\n"
-            "Нажмите «Создать заявку», выберите дату и время, "
-            "а затем добавьте комментарий для мастера.",
             reply_markup=sketch_card_kb,
         )
         return

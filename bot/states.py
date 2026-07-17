@@ -48,6 +48,16 @@ class AdminWorkingHoursState(StatesGroup):
 
 
 class AdminSketchState(StatesGroup):
+    choosing_action = State()
+    choosing_style_to_delete = State()
+    confirming_style_delete = State()
+    choosing_style_to_edit = State()
+    waiting_style_name = State()
+    choosing_sketch_to_delete = State()
+    confirming_sketch_delete = State()
+    choosing_sketch_to_edit = State()
+    choosing_sketch_field = State()
+    choosing_sketch_style = State()
     choosing_style = State()
     waiting_new_style_name = State()
     waiting_name = State()
@@ -55,5 +65,9 @@ class AdminSketchState(StatesGroup):
     waiting_price = State()
     waiting_photo = State()
     waiting_status = State()
-    waiting_views = State()
+    waiting_edit_sketch_name = State()
+    waiting_edit_sketch_description = State()
+    waiting_edit_sketch_price = State()
+    waiting_edit_sketch_photo = State()
+    waiting_edit_sketch_status = State()
     confirming = State()
