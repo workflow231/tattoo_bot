@@ -17,4 +17,4 @@ RUN mkdir -p /app/data && chown -R bot:bot /app
 
 USER bot
 
-CMD ["python", "-m", "bot.main"]
+CMD ["sh", "-c", "alembic upgrade head && python -m bot.main"]
