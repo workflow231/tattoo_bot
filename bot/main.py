@@ -23,6 +23,7 @@ from utils.config import get_int_env, get_required_env
 from services.reminder_scheduler import start_reminder_scheduler
 
 from bot.middlewares.db import DbSessionMiddleware
+from bot.middlewares.update_idempotency import UpdateIdempotencyMiddleware
 
 load_dotenv()
 
@@ -41,6 +42,7 @@ async def main() -> None:
     bot = Bot(token=token)
     dp = Dispatcher(storage=storage)
 
+    dp.update.middleware(UpdateIdempotencyMiddleware())
     dp.update.middleware(DbSessionMiddleware())
 
     _include_routers(dp)

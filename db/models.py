@@ -45,6 +45,17 @@ class User(Base):
     )
 
 
+class ProcessedUpdate(Base):
+    __tablename__ = "processed_updates"
+
+    update_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
 class Style(Base):
     __tablename__ = "styles"
 

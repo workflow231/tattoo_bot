@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import User
@@ -44,11 +45,20 @@ async def get_or_create_user(
     if user:
         return user, False
 
-    user = await create_user(
-        session=session,
-        telegram_id=telegram_id,
-        username=username,
-    )
+    try:
+        user = await create_user(
+            session=session,
+            telegram_id=telegram_id,
+            username=username,
+        )
+    except IntegrityError:
+        await session.rollback()
+        user = await get_user_by_telegram_id(session, telegram_id)
+
+        if user:
+            return user, False
+
+        raise
 
     return user, True
 
