@@ -24,11 +24,14 @@ from services.reminder_scheduler import start_reminder_scheduler
 
 from bot.middlewares.db import DbSessionMiddleware
 from bot.middlewares.update_idempotency import UpdateIdempotencyMiddleware
+from scripts.migrate import main as run_database_migrations
 
 load_dotenv()
 
 
 async def main() -> None:
+    run_database_migrations()
+
     token = get_required_env("BOT_TOKEN")
     redis_url = get_required_env("REDIS_URL")
     bot_mode = os.getenv("BOT_MODE", "polling").strip().lower()

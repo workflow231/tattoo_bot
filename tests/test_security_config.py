@@ -1,5 +1,6 @@
 import pytest
 
+import bot.main as bot_main
 from bot.main import _get_webhook_path
 from utils.config import (
     get_admin_ids_from_env,
@@ -61,3 +62,23 @@ def test_user_service_admin_ids_parse_list_and_ignore_invalid_values(
     monkeypatch.setenv("ADMIN_ID", "789")
 
     assert get_admin_ids_from_env() == {123, 456, 789}
+
+
+@pytest.mark.anyio
+async def test_main_runs_migrations_before_reading_config(monkeypatch) -> None:
+    events: list[str] = []
+
+    def run_database_migrations() -> None:
+        events.append("migrate")
+
+    def get_required_env(name: str) -> str:
+        events.append(f"env:{name}")
+        raise RuntimeError("stop")
+
+    monkeypatch.setattr(bot_main, "run_database_migrations", run_database_migrations)
+    monkeypatch.setattr(bot_main, "get_required_env", get_required_env)
+
+    with pytest.raises(RuntimeError, match="stop"):
+        await bot_main.main()
+
+    assert events == ["migrate", "env:BOT_TOKEN"]
