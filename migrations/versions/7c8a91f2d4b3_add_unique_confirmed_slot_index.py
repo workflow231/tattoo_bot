@@ -26,6 +26,7 @@ def upgrade() -> None:
         ["appointment_date", "appointment_time"],
         unique=True,
         sqlite_where=sa.text("status = 'confirmed'"),
+        if_not_exists=True,
     )
 
 

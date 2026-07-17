@@ -40,13 +40,18 @@ def upgrade() -> None:
             "appointment slots exist."
         )
 
-    op.drop_index("ux_appointments_confirmed_slot", table_name="appointments")
+    op.drop_index(
+        "ux_appointments_confirmed_slot",
+        table_name="appointments",
+        if_exists=True,
+    )
     op.create_index(
         "ux_appointments_busy_slot",
         "appointments",
         ["appointment_date", "appointment_time"],
         unique=True,
         sqlite_where=sa.text("status IN ('pending', 'confirmed')"),
+        if_not_exists=True,
     )
 
 

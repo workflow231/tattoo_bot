@@ -27,16 +27,18 @@ def upgrade() -> None:
     sa.Column('time_slot', sa.Time(), nullable=True),
     sa.Column('type', sa.String(length=30), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    if_not_exists=True,
     )
-    op.create_index(op.f('ix_schedule_exceptions_date'), 'schedule_exceptions', ['date'], unique=False)
-    op.create_index(op.f('ix_schedule_exceptions_type'), 'schedule_exceptions', ['type'], unique=False)
+    op.create_index(op.f('ix_schedule_exceptions_date'), 'schedule_exceptions', ['date'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_schedule_exceptions_type'), 'schedule_exceptions', ['type'], unique=False, if_not_exists=True)
     op.create_table('styles',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=100), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('name')
+    sa.UniqueConstraint('name'),
+    if_not_exists=True,
     )
     op.create_table('users',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -44,9 +46,10 @@ def upgrade() -> None:
     sa.Column('username', sa.String(length=64), nullable=True),
     sa.Column('is_admin', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    if_not_exists=True,
     )
-    op.create_index(op.f('ix_users_telegram_id'), 'users', ['telegram_id'], unique=True)
+    op.create_index(op.f('ix_users_telegram_id'), 'users', ['telegram_id'], unique=True, if_not_exists=True)
     op.create_table('sketches',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('style_id', sa.Integer(), nullable=False),
@@ -59,9 +62,10 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['style_id'], ['styles.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    if_not_exists=True,
     )
-    op.create_index(op.f('ix_sketches_style_id'), 'sketches', ['style_id'], unique=False)
+    op.create_index(op.f('ix_sketches_style_id'), 'sketches', ['style_id'], unique=False, if_not_exists=True)
     op.create_table('appointments',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
@@ -76,12 +80,13 @@ def upgrade() -> None:
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['sketch_id'], ['sketches.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    if_not_exists=True,
     )
-    op.create_index(op.f('ix_appointments_appointment_date'), 'appointments', ['appointment_date'], unique=False)
-    op.create_index(op.f('ix_appointments_sketch_id'), 'appointments', ['sketch_id'], unique=False)
-    op.create_index(op.f('ix_appointments_status'), 'appointments', ['status'], unique=False)
-    op.create_index(op.f('ix_appointments_user_id'), 'appointments', ['user_id'], unique=False)
+    op.create_index(op.f('ix_appointments_appointment_date'), 'appointments', ['appointment_date'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_appointments_sketch_id'), 'appointments', ['sketch_id'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_appointments_status'), 'appointments', ['status'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_appointments_user_id'), 'appointments', ['user_id'], unique=False, if_not_exists=True)
     # ### end Alembic commands ###
 
 

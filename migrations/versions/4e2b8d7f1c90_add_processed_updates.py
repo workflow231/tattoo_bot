@@ -31,6 +31,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.PrimaryKeyConstraint("update_id"),
+        if_not_exists=True,
     )
 
 

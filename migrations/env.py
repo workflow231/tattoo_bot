@@ -101,6 +101,7 @@ def run_migrations_online() -> None:
     with connectable.connect() as connection:
         connection.execute(text("PRAGMA foreign_keys=ON"))
         baseline_legacy_sqlite_connection(connection)
+        connection.commit()
         context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
