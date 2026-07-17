@@ -9,7 +9,9 @@ from scripts.migrate import (
     WORKING_HOURS_REVISION,
     _detect_existing_revision,
     _get_tables,
+    baseline_legacy_sqlite_connection,
 )
+from sqlalchemy import create_engine, text
 
 
 def test_detects_initial_revision_for_legacy_base_schema():
@@ -89,6 +91,21 @@ def test_unknown_schema_is_not_stamped():
     connection.execute("CREATE TABLE users (id INTEGER PRIMARY KEY)")
 
     assert _detect_existing_revision(connection, _get_tables(connection)) is None
+
+
+def test_baseline_legacy_sqlite_connection_creates_alembic_version():
+    engine = create_engine("sqlite:///:memory:")
+
+    with engine.begin() as connection:
+        _create_base_tables(connection.connection.driver_connection)
+
+        baseline_legacy_sqlite_connection(connection)
+
+        revision = connection.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
+
+    assert revision == INITIAL_REVISION
 
 
 def _create_base_tables(connection: sqlite3.Connection) -> None:

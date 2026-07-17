@@ -3,6 +3,9 @@ import sqlite3
 import subprocess
 import sys
 from pathlib import Path
+from typing import Protocol
+
+from sqlalchemy import text
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 INITIAL_REVISION = "bdcbded95efc"
@@ -52,6 +55,36 @@ def _stamp_legacy_sqlite_database(db_path: Path) -> None:
         _run_alembic("stamp", revision)
 
 
+class _SqlConnection(Protocol):
+    def execute(self, statement, parameters=None): ...
+
+
+def baseline_legacy_sqlite_connection(connection: _SqlConnection) -> None:
+    tables = _get_sqlalchemy_tables(connection)
+
+    if "alembic_version" in tables or not tables:
+        return
+
+    revision = _detect_existing_revision_from_sets(
+        tables=tables,
+        indexes=_get_sqlalchemy_indexes(connection),
+    )
+
+    if not revision:
+        return
+
+    connection.execute(text("""
+            CREATE TABLE IF NOT EXISTS alembic_version (
+                version_num VARCHAR(32) NOT NULL,
+                CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
+            )
+            """))
+    connection.execute(
+        text("INSERT INTO alembic_version (version_num) VALUES (:revision)"),
+        {"revision": revision},
+    )
+
+
 def _get_tables(connection: sqlite3.Connection) -> set[str]:
     rows = connection.execute("""
         SELECT name
@@ -74,6 +107,16 @@ def _detect_existing_revision(
     connection: sqlite3.Connection,
     tables: set[str],
 ) -> str | None:
+    return _detect_existing_revision_from_sets(
+        tables=tables,
+        indexes=_get_indexes(connection),
+    )
+
+
+def _detect_existing_revision_from_sets(
+    tables: set[str],
+    indexes: set[str],
+) -> str | None:
     base_tables = {
         "schedule_exceptions",
         "styles",
@@ -85,7 +128,6 @@ def _detect_existing_revision(
     if not base_tables.issubset(tables):
         return None
 
-    indexes = _get_indexes(connection)
     revision = INITIAL_REVISION
 
     if "weekly_day_offs" in tables:
@@ -104,6 +146,24 @@ def _detect_existing_revision(
         revision = PROCESSED_UPDATES_REVISION
 
     return revision
+
+
+def _get_sqlalchemy_tables(connection: _SqlConnection) -> set[str]:
+    rows = connection.execute(text("""
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+            """)).fetchall()
+    return {row[0] for row in rows}
+
+
+def _get_sqlalchemy_indexes(connection: _SqlConnection) -> set[str]:
+    rows = connection.execute(text("""
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'index' AND name NOT LIKE 'sqlite_%'
+            """)).fetchall()
+    return {row[0] for row in rows}
 
 
 def _run_alembic(*args: str) -> None:
