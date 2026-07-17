@@ -36,7 +36,7 @@ services:
   bot:
     build:
       context: .
-    command: sh -c "alembic upgrade head && python -m bot.main"
+    command: sh -c "python -m scripts.migrate && python -m bot.main"
     environment:
       BOT_TOKEN: ${BOT_TOKEN:-}
       BOT_MODE: ${BOT_MODE:-webhook}
