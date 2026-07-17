@@ -10,6 +10,7 @@ from sqlalchemy import text
 from alembic import context
 from db.session import Base
 import db.models  # noqa: F401
+from scripts.migrate import baseline_legacy_sqlite_connection
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -99,6 +100,7 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         connection.execute(text("PRAGMA foreign_keys=ON"))
+        baseline_legacy_sqlite_connection(connection)
         context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
