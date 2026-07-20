@@ -36,12 +36,18 @@ def test_admin_sketch_service_builds_summary() -> None:
 
 
 @pytest.mark.anyio
-async def test_delete_style_rejects_style_with_sketches(monkeypatch) -> None:
+async def test_delete_style_removes_linked_sketches(monkeypatch) -> None:
     async def fake_get_style_by_id(session, style_id):
         return type("StyleStub", (), {"id": style_id, "name": "Графика"})()
 
     async def fake_count_sketches_by_style_id(session, style_id):
         return 2
+
+    async def fake_count_appointments_by_style_id(session, style_id):
+        return 0
+
+    async def fake_delete_style_with_sketches(session, style_id):
+        return 2, True
 
     monkeypatch.setattr(
         "services.admin_sketch_service.get_style_by_id",
@@ -51,10 +57,49 @@ async def test_delete_style_rejects_style_with_sketches(monkeypatch) -> None:
         "services.admin_sketch_service.count_sketches_by_style_id",
         fake_count_sketches_by_style_id,
     )
+    monkeypatch.setattr(
+        "services.admin_sketch_service.count_appointments_by_style_id",
+        fake_count_appointments_by_style_id,
+    )
+    monkeypatch.setattr(
+        "services.admin_sketch_service.delete_style_with_sketches",
+        fake_delete_style_with_sketches,
+    )
 
     result = await AdminSketchService(session=None).delete_style(style_id=1)
 
-    assert result == "Нельзя удалить стиль, пока в нём есть эскизы."
+    assert result == "Стиль «Графика» удалён. Удалено эскизов: 2."
+
+
+@pytest.mark.anyio
+async def test_delete_style_rejects_style_with_sketch_appointments(
+    monkeypatch,
+) -> None:
+    async def fake_get_style_by_id(session, style_id):
+        return type("StyleStub", (), {"id": style_id, "name": "Графика"})()
+
+    async def fake_count_sketches_by_style_id(session, style_id):
+        return 2
+
+    async def fake_count_appointments_by_style_id(session, style_id):
+        return 1
+
+    monkeypatch.setattr(
+        "services.admin_sketch_service.get_style_by_id",
+        fake_get_style_by_id,
+    )
+    monkeypatch.setattr(
+        "services.admin_sketch_service.count_sketches_by_style_id",
+        fake_count_sketches_by_style_id,
+    )
+    monkeypatch.setattr(
+        "services.admin_sketch_service.count_appointments_by_style_id",
+        fake_count_appointments_by_style_id,
+    )
+
+    result = await AdminSketchService(session=None).delete_style(style_id=1)
+
+    assert result == "Нельзя удалить стиль, потому что по его эскизам есть заявки."
 
 
 @pytest.mark.anyio

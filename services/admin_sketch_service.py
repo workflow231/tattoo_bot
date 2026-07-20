@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Sketch, Style
@@ -14,9 +15,10 @@ from db.repositories.sketch_repo import (
     update_sketch,
 )
 from db.repositories.style_repo import (
+    count_appointments_by_style_id,
     count_sketches_by_style_id,
     create_style,
-    delete_style,
+    delete_style_with_sketches,
     get_all_styles,
     get_style_by_id,
     get_style_by_name,
@@ -109,14 +111,31 @@ class AdminSketchService:
             session=self.session,
             style_id=style.id,
         )
+        appointments_count = await count_appointments_by_style_id(
+            session=self.session,
+            style_id=style.id,
+        )
 
-        if sketches_count:
-            return "Нельзя удалить стиль, пока в нём есть эскизы."
+        if appointments_count:
+            return "Нельзя удалить стиль, потому что по его эскизам есть заявки."
 
-        deleted = await delete_style(session=self.session, style_id=style.id)
+        try:
+            deleted_sketches_count, deleted = await delete_style_with_sketches(
+                session=self.session,
+                style_id=style.id,
+            )
+        except IntegrityError:
+            await self.session.rollback()
+            return "Нельзя удалить стиль, потому что по его эскизам есть заявки."
 
         if not deleted:
             return "Стиль не найден."
+
+        if sketches_count:
+            return (
+                f"Стиль «{style.name}» удалён. "
+                f"Удалено эскизов: {deleted_sketches_count}."
+            )
 
         return f"Стиль «{style.name}» удалён."
 
@@ -259,7 +278,7 @@ class AdminSketchService:
         )
 
     def build_style_delete_confirmation_text(self, style_name: str) -> str:
-        return f"Удалить стиль «{style_name}»?"
+        return f"Удалить стиль «{style_name}» и все его эскизы?"
 
     def build_sketch_delete_confirmation_text(self, sketch: Sketch) -> str:
         return f"Удалить эскиз «{sketch.name}»?"

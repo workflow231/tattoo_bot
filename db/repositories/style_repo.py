@@ -1,7 +1,7 @@
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import Sketch, Style
+from db.models import Appointment, Sketch, Style
 
 
 async def get_all_styles(session: AsyncSession) -> list | None:
@@ -51,6 +51,15 @@ async def count_sketches_by_style_id(session: AsyncSession, style_id: int) -> in
     return int(result.scalar_one())
 
 
+async def count_appointments_by_style_id(session: AsyncSession, style_id: int) -> int:
+    result = await session.execute(
+        select(func.count(Appointment.id))
+        .join(Sketch, Appointment.sketch_id == Sketch.id)
+        .where(Sketch.style_id == style_id)
+    )
+    return int(result.scalar_one())
+
+
 async def update_style_name(
     session: AsyncSession,
     style_id: int,
@@ -71,3 +80,15 @@ async def delete_style(session: AsyncSession, style_id: int) -> bool:
     result = await session.execute(delete(Style).where(Style.id == style_id))
     await session.commit()
     return bool(result.rowcount)
+
+
+async def delete_style_with_sketches(
+    session: AsyncSession,
+    style_id: int,
+) -> tuple[int, bool]:
+    sketches_result = await session.execute(
+        delete(Sketch).where(Sketch.style_id == style_id)
+    )
+    style_result = await session.execute(delete(Style).where(Style.id == style_id))
+    await session.commit()
+    return int(sketches_result.rowcount or 0), bool(style_result.rowcount)
