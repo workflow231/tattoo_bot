@@ -9,8 +9,9 @@ from db.repositories.appointment_repo import (
     list_tomorrow_confirmed_without_reminder,
     mark_reminder_sent,
 )
+from services.appointment_service import DATE_FORMAT, TIME_FORMAT, AppointmentService
 from services.client_text_service import ClientTextService
-from services.appointment_service import DATE_FORMAT, TIME_FORMAT
+from utils.timezone import today_in_bot_timezone
 
 
 class ReminderService:
@@ -19,7 +20,7 @@ class ReminderService:
         self.bot = bot
 
     async def send_tomorrow_reminders(self, today: date | None = None) -> int:
-        tomorrow = (today or date.today()) + timedelta(days=1)
+        tomorrow = (today or today_in_bot_timezone()) + timedelta(days=1)
         appointments = await list_tomorrow_confirmed_without_reminder(
             session=self.session,
             tomorrow=tomorrow,
@@ -58,7 +59,9 @@ class ReminderService:
         return True
 
     def build_reminder_text(self, appointment: Appointment) -> str:
-        sketch_name = appointment.sketch.name if appointment.sketch else "Не указан"
+        sketch_name = AppointmentService(
+            session=self.session
+        ).get_appointment_sketch_name(appointment)
 
         return ClientTextService().reminder_tomorrow(
             appointment_date=appointment.appointment_date.strftime(DATE_FORMAT),

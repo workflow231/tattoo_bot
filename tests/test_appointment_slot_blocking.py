@@ -90,6 +90,97 @@ async def test_create_pending_appointment_handles_busy_slot_race(monkeypatch) ->
 
 
 @pytest.mark.anyio
+async def test_create_pending_no_sketch_appointment_does_not_require_sketch(
+    monkeypatch,
+) -> None:
+    async def fake_get_user_by_telegram_id(self, telegram_id):
+        return _user()
+
+    async def fake_get_sketch(self, sketch_id):
+        raise AssertionError("no_sketch should not load a sketch")
+
+    async def fake_is_time_available(self, appointment_date, appointment_time):
+        return True
+
+    async def fake_create_appointment(**kwargs):
+        return kwargs
+
+    monkeypatch.setattr(
+        AppointmentService,
+        "get_user_by_telegram_id",
+        fake_get_user_by_telegram_id,
+    )
+    monkeypatch.setattr(AppointmentService, "get_sketch", fake_get_sketch)
+    monkeypatch.setattr(
+        AppointmentService,
+        "is_time_available",
+        fake_is_time_available,
+    )
+    monkeypatch.setattr(
+        "services.appointment_service.create_appointment",
+        fake_create_appointment,
+    )
+
+    result = await AppointmentService(session=None).create_pending_appointment(
+        telegram_id=123,
+        draft=AppointmentDraft(
+            sketch_id=None,
+            appointment_date=date(2026, 7, 13),
+            appointment_time=time(12, 0),
+            comment=None,
+            request_type="no_sketch",
+        ),
+    )
+
+    assert result["sketch_id"] is None
+    assert result["request_type"] == "no_sketch"
+
+
+@pytest.mark.anyio
+async def test_create_pending_custom_sketch_requires_photo(monkeypatch) -> None:
+    async def fake_get_user_by_telegram_id(self, telegram_id):
+        return _user()
+
+    monkeypatch.setattr(
+        AppointmentService,
+        "get_user_by_telegram_id",
+        fake_get_user_by_telegram_id,
+    )
+
+    result = await AppointmentService(session=None).create_pending_appointment(
+        telegram_id=123,
+        draft=AppointmentDraft(
+            sketch_id=None,
+            appointment_date=date(2026, 7, 13),
+            appointment_time=time(12, 0),
+            comment=None,
+            request_type="custom_sketch",
+        ),
+    )
+
+    assert result is None
+
+
+def test_appointment_sketch_name_formats_request_types() -> None:
+    service = AppointmentService(session=None)
+
+    assert (
+        service.format_appointment_sketch(
+            request_type="custom_sketch",
+            sketch_name=None,
+        )
+        == "Мой эскиз — цена договорная"
+    )
+    assert (
+        service.format_appointment_sketch(
+            request_type="no_sketch",
+            sketch_name=None,
+        )
+        == "Без эскиза"
+    )
+
+
+@pytest.mark.anyio
 async def test_client_calendar_month_uses_monday_weeks_without_padding(
     monkeypatch,
 ) -> None:

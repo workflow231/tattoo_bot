@@ -21,8 +21,10 @@ from db.repositories.schedule_repo import (
 )
 from db.repositories.sketch_repo import get_sketch_by_id_with_style
 from db.repositories.user_repo import get_user_by_telegram_id
-from utils.admin_calendar import MONTH_NAMES, iter_month_weeks, shift_month
+from services.client_text_service import ClientTextService
 from services.working_hours_service import WorkingHoursService
+from utils.admin_calendar import MONTH_NAMES, iter_month_weeks, shift_month
+from utils.timezone import today_in_bot_timezone
 
 DATE_FORMAT = "%d.%m.%Y"
 TIME_FORMAT = "%H:%M"
@@ -30,10 +32,12 @@ TIME_FORMAT = "%H:%M"
 
 @dataclass(frozen=True)
 class AppointmentDraft:
-    sketch_id: int
+    sketch_id: int | None
     appointment_date: date
     appointment_time: time
     comment: str | None
+    request_type: str = "catalog_sketch"
+    client_sketch_photo_file_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -83,9 +87,27 @@ class AppointmentService:
         draft: AppointmentDraft,
     ) -> Appointment | None:
         user = await self.get_user_by_telegram_id(telegram_id=telegram_id)
-        sketch = await self.get_sketch(sketch_id=draft.sketch_id)
 
-        if not user or not sketch or sketch.status != "available":
+        if not user or not self.is_valid_request_type(draft.request_type):
+            return None
+
+        sketch_id = draft.sketch_id
+
+        if draft.request_type == "catalog_sketch":
+            if not sketch_id:
+                return None
+
+            sketch = await self.get_sketch(sketch_id=sketch_id)
+
+            if not sketch or sketch.status != "available":
+                return None
+        else:
+            sketch_id = None
+
+        if (
+            draft.request_type == "custom_sketch"
+            and not draft.client_sketch_photo_file_id
+        ):
             return None
 
         slot_is_available = await self.is_time_available(
@@ -100,9 +122,11 @@ class AppointmentService:
             return await create_appointment(
                 session=self.session,
                 user_id=user.id,
-                sketch_id=sketch.id,
+                sketch_id=sketch_id,
                 appointment_date=draft.appointment_date,
                 appointment_time=draft.appointment_time,
+                request_type=draft.request_type,
+                client_sketch_photo_file_id=draft.client_sketch_photo_file_id,
                 client_comment=draft.comment,
                 status="pending",
             )
@@ -163,10 +187,10 @@ class AppointmentService:
         self,
         appointment_date: date,
     ) -> AppointmentDateAvailability:
-        if appointment_date < date.today():
+        if appointment_date < today_in_bot_timezone():
             return AppointmentDateAvailability(
                 available=False,
-                message="Эта дата уже прошла. Выберите другую дату.",
+                message=ClientTextService().text("appointment_date_in_past"),
             )
 
         temporary_day_off = await find_temporary_day_off(
@@ -177,7 +201,7 @@ class AppointmentService:
         if temporary_day_off:
             return AppointmentDateAvailability(
                 available=False,
-                message="В этот день у мастера выходной. Выберите другую дату.",
+                message=ClientTextService().text("appointment_temporary_day_off"),
             )
 
         weekly_day_off = await find_weekly_day_off(
@@ -188,7 +212,7 @@ class AppointmentService:
         if weekly_day_off:
             return AppointmentDateAvailability(
                 available=False,
-                message="Этот день недели отмечен как выходной. Выберите другую дату.",
+                message=ClientTextService().text("appointment_weekly_day_off"),
             )
 
         available_times = await self.get_available_time_texts(
@@ -198,7 +222,7 @@ class AppointmentService:
         if not available_times:
             return AppointmentDateAvailability(
                 available=False,
-                message="На эту дату нет свободных слотов. Выберите другую дату.",
+                message=ClientTextService().text("appointment_no_slots_for_date"),
             )
 
         return AppointmentDateAvailability(available=True)
@@ -229,7 +253,7 @@ class AppointmentService:
             for current_date in month_week:
                 label = str(current_date.day)
 
-                if current_date < date.today():
+                if current_date < today_in_bot_timezone():
                     label = f"{label} ×"
                 else:
                     available_times = await self.get_available_time_texts(
@@ -329,10 +353,10 @@ class AppointmentService:
             return None
 
         if appointment.status == "confirmed":
-            return "Подтверждённую заявку нельзя отменить в боте. Напишите мастеру."
+            return ClientTextService().text("appointment_cancel_confirmed_not_allowed")
 
         if appointment.status != "pending":
-            return "Эту заявку уже нельзя отменить."
+            return ClientTextService().text("appointment_cancel_unavailable")
 
         cancelled_appointment = await change_appointment_status(
             session=self.session,
@@ -343,7 +367,7 @@ class AppointmentService:
         if not cancelled_appointment:
             return None
 
-        return "Заявка отменена."
+        return ClientTextService().text("appointment_user_cancelled")
 
     async def get_current_user_appointment(
         self,
@@ -367,7 +391,7 @@ class AppointmentService:
         except ValueError:
             return None
 
-        if parsed_date < date.today():
+        if parsed_date < today_in_bot_timezone():
             return None
 
         return parsed_date
@@ -380,39 +404,44 @@ class AppointmentService:
 
     def build_summary_text(
         self,
-        sketch: Sketch,
+        sketch: Sketch | None,
         draft: AppointmentDraft,
     ) -> str:
         comment = draft.comment or "Не указан"
+        sketch_name = self.format_appointment_sketch(
+            request_type=draft.request_type,
+            sketch_name=sketch.name if sketch else None,
+        )
 
-        return (
-            "Проверьте заявку:\n\n"
-            f"Эскиз: {sketch.name}\n"
-            f"Дата: {draft.appointment_date.strftime(DATE_FORMAT)}\n"
-            f"Время: {draft.appointment_time.strftime(TIME_FORMAT)}\n"
-            f"Комментарий: {comment}\n\n"
-            "Статус после создания: ждёт подтверждения"
+        return ClientTextService().format_text(
+            "appointment_summary",
+            sketch_name=sketch_name,
+            appointment_date=draft.appointment_date.strftime(DATE_FORMAT),
+            appointment_time=draft.appointment_time.strftime(TIME_FORMAT),
+            comment=comment,
         )
 
     def build_list_item_text(self, appointment: Appointment) -> str:
-        return (
-            f"#{appointment.id} — "
-            f"{appointment.appointment_date.strftime(DATE_FORMAT)} "
-            f"{appointment.appointment_time.strftime(TIME_FORMAT)} — "
-            f"{self.format_status(appointment.status)}"
+        return ClientTextService().format_text(
+            "appointment_list_item",
+            appointment_id=str(appointment.id),
+            appointment_date=appointment.appointment_date.strftime(DATE_FORMAT),
+            appointment_time=appointment.appointment_time.strftime(TIME_FORMAT),
+            status=self.format_status(appointment.status),
         )
 
     def build_appointment_card_text(self, appointment: Appointment) -> str:
-        sketch_name = appointment.sketch.name if appointment.sketch else "Не указан"
+        sketch_name = self.get_appointment_sketch_name(appointment)
         comment = appointment.client_comment or "Не указан"
 
-        return (
-            f"Заявка #{appointment.id}\n\n"
-            f"Эскиз: {sketch_name}\n"
-            f"Дата: {appointment.appointment_date.strftime(DATE_FORMAT)}\n"
-            f"Время: {appointment.appointment_time.strftime(TIME_FORMAT)}\n"
-            f"Статус: {self.format_status(appointment.status)}\n"
-            f"Комментарий: {comment}"
+        return ClientTextService().format_text(
+            "appointment_card",
+            appointment_id=str(appointment.id),
+            sketch_name=sketch_name,
+            appointment_date=appointment.appointment_date.strftime(DATE_FORMAT),
+            appointment_time=appointment.appointment_time.strftime(TIME_FORMAT),
+            status=self.format_status(appointment.status),
+            comment=comment,
         )
 
     def format_status(self, status: str) -> str:
@@ -424,3 +453,26 @@ class AppointmentService:
         }
 
         return statuses.get(status, status)
+
+    def get_appointment_sketch_name(self, appointment: Appointment) -> str:
+        return self.format_appointment_sketch(
+            request_type=getattr(appointment, "request_type", "catalog_sketch"),
+            sketch_name=appointment.sketch.name if appointment.sketch else None,
+        )
+
+    @staticmethod
+    def format_appointment_sketch(
+        request_type: str,
+        sketch_name: str | None,
+    ) -> str:
+        if request_type == "custom_sketch":
+            return "Мой эскиз — цена договорная"
+
+        if request_type == "no_sketch":
+            return "Без эскиза"
+
+        return sketch_name or "Не указан"
+
+    @staticmethod
+    def is_valid_request_type(request_type: str) -> bool:
+        return request_type in {"catalog_sketch", "custom_sketch", "no_sketch"}

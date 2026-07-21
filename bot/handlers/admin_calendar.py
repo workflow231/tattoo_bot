@@ -26,6 +26,7 @@ from bot.keyboards import (
 from bot.states import AdminCalendarState
 from services.admin_appointment_service import AdminAppointmentService
 from services.admin_calendar_service import AdminCalendarService
+from utils.timezone import today_in_bot_timezone
 
 router = Router()
 STALE_ADMIN_CALENDAR_TEXT = "Сессия календаря устарела. Откройте календарь заново."
@@ -52,7 +53,7 @@ async def show_admin_calendar(
         "Календарь мастера открыт.",
         reply_markup=build_admin_calendar_keyboard([]),
     )
-    today = date.today()
+    today = today_in_bot_timezone()
     await _send_admin_calendar_month(
         session=session,
         message=message,
@@ -118,21 +119,34 @@ async def _handle_admin_calendar_navigation_callback(
     parts: list[str],
 ) -> bool:
     if action == "month" and len(parts) == 4:
+        calendar_month = _parse_callback_month(parts[2], parts[3])
+
+        if not calendar_month:
+            await _answer_stale_admin_calendar_callback(callback)
+            return True
+
+        year, month = calendar_month
         await _edit_admin_calendar_month(
             session=session,
             callback=callback,
             state=state,
-            year=int(parts[2]),
-            month=int(parts[3]),
+            year=year,
+            month=month,
         )
         return True
 
     if action == "day" and len(parts) == 3:
+        appointment_date = _parse_callback_date(parts[2])
+
+        if not appointment_date:
+            await _answer_stale_admin_calendar_callback(callback)
+            return True
+
         await _edit_admin_calendar_day(
             session=session,
             callback=callback,
             state=state,
-            appointment_date=date.fromisoformat(parts[2]),
+            appointment_date=appointment_date,
         )
         return True
 
@@ -159,6 +173,10 @@ async def _handle_admin_calendar_navigation_callback(
             state=state,
             appointment_date=appointment_date,
         )
+        return True
+
+    if action in {"month", "day"}:
+        await _answer_stale_admin_calendar_callback(callback)
         return True
 
     return False
@@ -309,31 +327,53 @@ async def _handle_admin_calendar_appointment_callback(
     parts: list[str],
 ) -> bool:
     if action == "appointment" and len(parts) == 3:
+        appointment_id = _parse_callback_int(parts[2])
+
+        if appointment_id is None:
+            await _answer_stale_admin_calendar_callback(callback)
+            return True
+
         await _edit_admin_calendar_appointment_card(
             session=session,
             callback=callback,
             state=state,
-            appointment_id=int(parts[2]),
+            appointment_id=appointment_id,
         )
         return True
 
     if action in {"confirm", "reject"} and len(parts) == 3:
+        appointment_id = _parse_callback_int(parts[2])
+
+        if appointment_id is None:
+            await _answer_stale_admin_calendar_callback(callback)
+            return True
+
         await _handle_admin_calendar_appointment_action_callback(
             session=session,
             callback=callback,
             state=state,
-            appointment_id=int(parts[2]),
+            appointment_id=appointment_id,
             action=action,
         )
         return True
 
     if action == "client" and len(parts) == 3:
+        appointment_id = _parse_callback_int(parts[2])
+
+        if appointment_id is None:
+            await _answer_stale_admin_calendar_callback(callback)
+            return True
+
         service = AdminAppointmentService(session=session)
         contact_text = await service.get_client_contact_text(
-            appointment_id=int(parts[2])
+            appointment_id=appointment_id
         )
         await callback.message.answer(contact_text or "Заявка не найдена.")
         await callback.answer()
+        return True
+
+    if action in {"appointment", "confirm", "reject", "client"}:
+        await _answer_stale_admin_calendar_callback(callback)
         return True
 
     return False
@@ -695,6 +735,11 @@ async def _send_admin_calendar_appointment_card(
             appointment_id=appointment_id,
         ),
     )
+    await _send_client_sketch_photo(
+        message=message,
+        service=service,
+        appointment_id=appointment_id,
+    )
 
 
 async def _edit_admin_calendar_appointment_card(
@@ -717,6 +762,11 @@ async def _edit_admin_calendar_appointment_card(
         reply_markup=build_admin_calendar_appointment_card_inline_keyboard(
             appointment_id=appointment_id,
         ),
+    )
+    await _send_client_sketch_photo(
+        message=callback.message,
+        service=service,
+        appointment_id=appointment_id,
     )
     await callback.answer()
 
@@ -787,6 +837,11 @@ async def _handle_admin_appointment_action(
                 appointment_id=int(appointment_id),
             ),
         )
+        await _send_client_sketch_photo(
+            message=message,
+            service=service,
+            appointment_id=int(appointment_id),
+        )
         return
 
     await state.clear()
@@ -826,6 +881,11 @@ async def _handle_admin_calendar_appointment_action_callback(
                 appointment_id=appointment_id,
             ),
         )
+        await _send_client_sketch_photo(
+            message=callback.message,
+            service=service,
+            appointment_id=appointment_id,
+        )
         await callback.answer()
         return
 
@@ -848,6 +908,33 @@ async def _send_client_notification(
         return False
 
     return True
+
+
+async def _send_client_sketch_photo(
+    message: Message,
+    service: AdminAppointmentService,
+    appointment_id: int,
+) -> None:
+    photo_file_id = await service.get_client_sketch_photo_file_id(
+        appointment_id=appointment_id,
+    )
+
+    if photo_file_id:
+        reply_markup = build_admin_calendar_appointment_card_inline_keyboard(
+            appointment_id=appointment_id,
+        )
+
+        try:
+            await message.answer_photo(
+                photo=photo_file_id,
+                caption="Эскиз клиента",
+                reply_markup=reply_markup,
+            )
+        except (TelegramAPIError, TelegramNetworkError):
+            await message.answer(
+                "Фото эскиза клиента сейчас недоступно.",
+                reply_markup=reply_markup,
+            )
 
 
 def _message_from_admin(session: AsyncSession, message: Message) -> bool:
@@ -877,5 +964,34 @@ def _parse_state_date(value: str | None) -> date | None:
 
     try:
         return date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+async def _answer_stale_admin_calendar_callback(callback: CallbackQuery) -> None:
+    await callback.answer(STALE_ADMIN_CALENDAR_TEXT, show_alert=True)
+
+
+def _parse_callback_month(year_text: str, month_text: str) -> tuple[int, int] | None:
+    try:
+        year = int(year_text)
+        month = int(month_text)
+        date(year, month, 1)
+    except ValueError:
+        return None
+
+    return year, month
+
+
+def _parse_callback_date(value: str) -> date | None:
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _parse_callback_int(value: str) -> int | None:
+    try:
+        return int(value)
     except ValueError:
         return None

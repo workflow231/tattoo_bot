@@ -13,12 +13,18 @@ BACK_BUTTON = "⬅️ Назад"
 MAIN_MENU_BUTTON = "🏠 Главное меню"
 CATALOG_BUTTON = "Запись"
 
+MY_SKETCH_BUTTON = "Мой эскиз"
+CHOOSE_SKETCH_BUTTON = "Выбрать эскиз"
+SEND_MY_SKETCH_BUTTON = "Пришлите ваш эскиз"
+NO_SKETCH_REQUEST_BUTTON = "Заявка без эскиза"
 CREATE_REQUEST_BUTTON = "📝 Создать заявку"
 CHAT_WITH_MASTER_BUTTON = "👨‍🎨 Чат с мастером"
 PREVIOUS_PAGE_BUTTON = "⬅️ Страница"
 NEXT_PAGE_BUTTON = "Страница ➡️"
 CATALOG_PAGE_SIZE = 10
+APPOINTMENT_LIST_PAGE_SIZE = 10
 MY_APPOINTMENTS_BUTTON = "Мои заявки"
+MY_SOCIALS_BUTTON = "Мои соцсети"
 CANCEL_APPOINTMENT_BUTTON = "Отменить заявку"
 ADMIN_APPOINTMENTS_BUTTON = "Заявки"
 ADMIN_SKETCHES_BUTTON = "Эскизы"
@@ -96,6 +102,38 @@ def build_back_main_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
+def build_booking_menu_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(text=MY_SKETCH_BUTTON),
+                KeyboardButton(text=CHOOSE_SKETCH_BUTTON),
+            ],
+            [KeyboardButton(text=CHAT_WITH_MASTER_BUTTON)],
+            [KeyboardButton(text=NO_SKETCH_REQUEST_BUTTON)],
+            [
+                KeyboardButton(text=BACK_BUTTON),
+                KeyboardButton(text=MAIN_MENU_BUTTON),
+            ],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def build_custom_sketch_menu_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=SEND_MY_SKETCH_BUTTON)],
+            [KeyboardButton(text=CHAT_WITH_MASTER_BUTTON)],
+            [
+                KeyboardButton(text=BACK_BUTTON),
+                KeyboardButton(text=MAIN_MENU_BUTTON),
+            ],
+        ],
+        resize_keyboard=True,
+    )
+
+
 def build_skip_back_main_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -149,11 +187,20 @@ def build_sketches_reply_keyboard(
 ) -> ReplyKeyboardMarkup:
     keyboard = []
     page_items = _get_page_items(sketches, page=page, page_size=page_size)
+    duplicate_texts = _get_duplicate_sketch_button_texts(page_items)
 
     for sketch in page_items:
-        price = f" — от {sketch.price} ₽" if sketch.price else " — цена договорная"
-
-        keyboard.append([KeyboardButton(text=f"{sketch.name}{price}")])
+        keyboard.append(
+            [
+                KeyboardButton(
+                    text=build_sketch_button_text(
+                        sketch=sketch,
+                        disambiguate=_get_base_sketch_button_text(sketch)
+                        in duplicate_texts,
+                    )
+                )
+            ]
+        )
 
     _append_pagination_row(
         keyboard=keyboard,
@@ -172,6 +219,39 @@ def build_sketches_reply_keyboard(
         keyboard=keyboard,
         resize_keyboard=True,
     )
+
+
+def build_sketch_button_text(sketch: Sketch, disambiguate: bool = False) -> str:
+    text = _get_base_sketch_button_text(sketch)
+
+    if disambiguate:
+        return f"{text} (#{sketch.id})"
+
+    return text
+
+
+def get_duplicate_sketch_button_texts(sketches: list[Sketch]) -> set[str]:
+    return _get_duplicate_sketch_button_texts(sketches)
+
+
+def _get_base_sketch_button_text(sketch: Sketch) -> str:
+    price = f" — от {sketch.price} ₽" if sketch.price else " — цена договорная"
+    return f"{sketch.name}{price}"
+
+
+def _get_duplicate_sketch_button_texts(sketches: list[Sketch]) -> set[str]:
+    seen = set()
+    duplicates = set()
+
+    for sketch in sketches:
+        text = _get_base_sketch_button_text(sketch)
+
+        if text in seen:
+            duplicates.add(text)
+        else:
+            seen.add(text)
+
+    return duplicates
 
 
 def build_appointment_date_keyboard() -> ReplyKeyboardMarkup:
@@ -247,11 +327,21 @@ def build_appointment_confirm_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
-def build_my_appointments_keyboard(appointments) -> ReplyKeyboardMarkup:
+def build_my_appointments_keyboard(
+    appointments,
+    page: int = 0,
+    page_size: int = APPOINTMENT_LIST_PAGE_SIZE,
+) -> ReplyKeyboardMarkup:
+    page_items = _get_page_items(appointments, page=page, page_size=page_size)
     keyboard = [
-        [KeyboardButton(text=f"Заявка #{appointment.id}")]
-        for appointment in appointments
+        [KeyboardButton(text=f"Заявка #{appointment.id}")] for appointment in page_items
     ]
+    _append_pagination_row(
+        keyboard=keyboard,
+        items_count=len(appointments),
+        page=page,
+        page_size=page_size,
+    )
     keyboard.append([KeyboardButton(text=MAIN_MENU_BUTTON)])
 
     return ReplyKeyboardMarkup(
@@ -299,11 +389,22 @@ def build_admin_appointment_filters_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
-def build_admin_appointments_keyboard(appointments) -> ReplyKeyboardMarkup:
+def build_admin_appointments_keyboard(
+    appointments,
+    page: int = 0,
+    page_size: int = APPOINTMENT_LIST_PAGE_SIZE,
+) -> ReplyKeyboardMarkup:
+    page_items = _get_page_items(appointments, page=page, page_size=page_size)
     keyboard = [
         [KeyboardButton(text=f"Открыть #{appointment.id}")]
-        for appointment in appointments
+        for appointment in page_items
     ]
+    _append_pagination_row(
+        keyboard=keyboard,
+        items_count=len(appointments),
+        page=page,
+        page_size=page_size,
+    )
     keyboard.append(
         [
             KeyboardButton(text=BACK_BUTTON),
@@ -849,6 +950,7 @@ client_menu_kb = ReplyKeyboardMarkup(
         ],
         [
             KeyboardButton(text=MY_APPOINTMENTS_BUTTON),
+            KeyboardButton(text=MY_SOCIALS_BUTTON),
         ],
         [
             KeyboardButton(text=CHAT_WITH_MASTER_BUTTON),

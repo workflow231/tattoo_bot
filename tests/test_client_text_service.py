@@ -1,6 +1,11 @@
 import json
 
-from services.client_text_service import ClientTextService, TELEGRAM_MESSAGE_LIMIT
+from services.client_text_service import (
+    DEFAULT_CONFIG_PATH,
+    DEFAULT_TEXTS,
+    ClientTextService,
+    TELEGRAM_MESSAGE_LIMIT,
+)
 
 
 def test_client_text_service_uses_defaults() -> None:
@@ -12,6 +17,19 @@ def test_client_text_service_uses_defaults() -> None:
     assert "Заявка создана" in service.appointment_created()
     assert "Ваша заявка отклонена." in service.appointment_rejected()
     assert "Сессия устарела." in service.stale_session()
+    assert service.my_socials() == "Соц сети еще не добавленны"
+    assert service.text("booking_menu_prompt") == "Выберите вариант записи:"
+    assert (
+        service.format_text("appointment_choose_date", month_title="Июль 2026")
+        == "Выберите дату: Июль 2026\n\n"
+        "Недоступные дни отмечены символом ×."
+    )
+
+
+def test_client_text_config_has_all_default_keys() -> None:
+    data = json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
+
+    assert set(DEFAULT_TEXTS).issubset(data)
 
 
 def test_client_text_service_supports_config_overrides(tmp_path) -> None:
@@ -70,6 +88,21 @@ def test_client_text_service_formats_dynamic_client_messages(tmp_path) -> None:
     )
 
 
+def test_client_text_service_formats_generic_template(tmp_path) -> None:
+    config_path = _write_config(
+        tmp_path=tmp_path,
+        data={"booking_menu_prompt": "Выберите: {kind}"},
+    )
+
+    assert (
+        ClientTextService(config_path=config_path).format_text(
+            "booking_menu_prompt",
+            kind="запись",
+        )
+        == "Выберите: запись"
+    )
+
+
 def test_client_text_service_falls_back_on_unknown_placeholder(tmp_path) -> None:
     config_path = _write_config(
         tmp_path=tmp_path,
@@ -115,6 +148,20 @@ def test_client_text_service_falls_back_on_too_long_rendered_text(tmp_path) -> N
         ClientTextService(config_path=config_path).master_contact(contact="@master")
         == "Связаться с мастером:\n\n@master"
     )
+
+
+def test_client_text_service_limits_too_long_fallback_render(tmp_path) -> None:
+    config_path = _write_config(
+        tmp_path=tmp_path,
+        data={"master_contact": "Связаться: {unknown}"},
+    )
+
+    text = ClientTextService(config_path=config_path).master_contact(
+        contact="x" * (TELEGRAM_MESSAGE_LIMIT + 100)
+    )
+
+    assert len(text) == TELEGRAM_MESSAGE_LIMIT
+    assert text.startswith("Связаться с мастером:")
 
 
 def _write_config(tmp_path, data: dict[str, str]):

@@ -1,5 +1,7 @@
 import os
 
+DEFAULT_BOT_TIMEZONE = "Europe/Moscow"
+
 
 def get_required_env(name: str) -> str:
     value = os.getenv(name)
@@ -29,6 +31,18 @@ def get_int_env(name: str, default: int) -> int:
         return int(raw_value)
     except ValueError as exc:
         raise RuntimeError(f"{name} must be an integer") from exc
+
+
+def get_timezone_name_env(
+    name: str = "BOT_TIMEZONE",
+    default: str = DEFAULT_BOT_TIMEZONE,
+) -> str:
+    raw_value = os.getenv(name)
+
+    if raw_value is None or not raw_value.strip():
+        return default
+
+    return raw_value.strip()
 
 
 def get_admin_ids_from_env() -> set[int]:

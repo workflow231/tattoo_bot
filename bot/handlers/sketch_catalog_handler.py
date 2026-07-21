@@ -5,17 +5,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.keyboards import (
     BACK_BUTTON,
-    CATALOG_BUTTON,
     CATALOG_PAGE_SIZE,
     CHAT_WITH_MASTER_BUTTON,
+    CHOOSE_SKETCH_BUTTON,
     MAIN_MENU_BUTTON,
     NEXT_PAGE_BUTTON,
     PREVIOUS_PAGE_BUTTON,
+    build_sketch_button_text,
     build_sketches_reply_keyboard,
     build_styles_reply_keyboard,
+    get_duplicate_sketch_button_texts,
     sketch_card_kb,
 )
 from bot.menu_utils import get_main_menu_for_message
+from services.client_text_service import ClientTextService
 from services.sketch_catalog_service import SketchCatalogService
 from services.master_contact_service import MasterContactService
 from bot.states import SketchCatalogState
@@ -23,12 +26,20 @@ from bot.states import SketchCatalogState
 router = Router()
 
 
-@router.message(F.text == CATALOG_BUTTON)
+@router.message(F.text == CHOOSE_SKETCH_BUTTON)
 async def sketch_catalog(
     message: Message,
     state: FSMContext,
     session: AsyncSession,
 ):
+    await start_sketch_catalog(message=message, state=state, session=session)
+
+
+async def start_sketch_catalog(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
     await state.clear()
 
     service = SketchCatalogService(session=session)
@@ -37,7 +48,7 @@ async def sketch_catalog(
 
     if not styles:
         await message.answer(
-            "К сожалению, список стилей пока пуст, но он обязательно скоро появится.",
+            ClientTextService().text("catalog_empty"),
             reply_markup=get_main_menu_for_message(session=session, message=message),
         )
         return
@@ -62,7 +73,7 @@ async def choose_style(
     if message.text == MAIN_MENU_BUTTON:
         await state.clear()
         await message.answer(
-            "Главное меню",
+            ClientTextService().text("main_menu"),
             reply_markup=get_main_menu_for_message(session=session, message=message),
         )
         return
@@ -83,7 +94,7 @@ async def choose_style(
     style_id = style_buttons.get(message.text)
 
     if not style_id:
-        await message.answer("Выберите стиль кнопкой из списка.")
+        await message.answer(ClientTextService().text("catalog_choose_style_button"))
         return
 
     service = SketchCatalogService(session=session)
@@ -91,7 +102,7 @@ async def choose_style(
     sketches = await service.get_sketches_by_style_id(style_id=style_id)
 
     if not sketches:
-        await message.answer("В этом стиле пока нет доступных эскизов.")
+        await message.answer(ClientTextService().text("catalog_style_empty"))
         return
 
     sketch_buttons = _build_sketch_buttons(sketches=sketches, page=0)
@@ -118,7 +129,7 @@ async def choose_sketch(
     if message.text == MAIN_MENU_BUTTON:
         await state.clear()
         await message.answer(
-            "Главное меню",
+            ClientTextService().text("main_menu"),
             reply_markup=get_main_menu_for_message(session=session, message=message),
         )
         return
@@ -132,7 +143,7 @@ async def choose_sketch(
 
         if not styles:
             await message.answer(
-                "К сожалению, список стилей пока пуст.",
+                ClientTextService().text("catalog_empty_short"),
                 reply_markup=get_main_menu_for_message(
                     session=session,
                     message=message,
@@ -167,7 +178,7 @@ async def choose_sketch(
     sketch_id = sketch_buttons.get(message.text)
 
     if not sketch_id:
-        await message.answer("Выберите эскиз кнопкой из списка.")
+        await message.answer(ClientTextService().text("catalog_choose_sketch_button"))
         return
 
     service = SketchCatalogService(session=session)
@@ -175,7 +186,7 @@ async def choose_sketch(
     sketch = await service.get_sketch_by_id(sketch_id=sketch_id)
 
     if not sketch:
-        await message.answer("Эскиз не найден или уже недоступен.")
+        await message.answer(ClientTextService().text("catalog_sketch_unavailable"))
         return
 
     await state.update_data(sketch_id=sketch.id)
@@ -196,7 +207,7 @@ async def sketch_selected_actions(
     if message.text == MAIN_MENU_BUTTON:
         await state.clear()
         await message.answer(
-            "Главное меню",
+            ClientTextService().text("main_menu"),
             reply_markup=get_main_menu_for_message(session=session, message=message),
         )
         return
@@ -208,7 +219,7 @@ async def sketch_selected_actions(
         if not style_id:
             await state.clear()
             await message.answer(
-                "Не удалось вернуться к списку эскизов. Откройте каталог заново.",
+                ClientTextService().text("catalog_return_failed"),
                 reply_markup=get_main_menu_for_message(
                     session=session,
                     message=message,
@@ -222,7 +233,7 @@ async def sketch_selected_actions(
         if not sketches:
             await state.clear()
             await message.answer(
-                "В этом стиле пока нет доступных эскизов.",
+                ClientTextService().text("catalog_style_empty"),
                 reply_markup=get_main_menu_for_message(
                     session=session,
                     message=message,
@@ -249,14 +260,9 @@ async def sketch_selected_actions(
         return
 
     await message.answer(
-        "Выберите действие кнопкой.",
+        ClientTextService().text("choose_action"),
         reply_markup=sketch_card_kb,
     )
-
-
-def _build_sketch_button_text(sketch) -> str:
-    price = f" — от {sketch.price} ₽" if sketch.price else " — цена договорная"
-    return f"{sketch.name}{price}"
 
 
 async def _send_styles_page(
@@ -272,7 +278,7 @@ async def _send_styles_page(
     if not styles:
         await state.clear()
         await message.answer(
-            "К сожалению, список стилей пока пуст.",
+            ClientTextService().text("catalog_empty_short"),
             reply_markup=get_main_menu_for_message(session=session, message=message),
         )
         return
@@ -287,7 +293,11 @@ async def _send_styles_page(
     await state.update_data(style_buttons=style_buttons, style_page=page)
     await state.set_state(SketchCatalogState.choosing_style)
     await message.answer(
-        _build_page_text(title="Выберите стиль", page=page, items_count=len(styles)),
+        _build_page_text(
+            title=ClientTextService().text("catalog_choose_style_title"),
+            page=page,
+            items_count=len(styles),
+        ),
         reply_markup=build_styles_reply_keyboard(styles=styles, page=page),
     )
 
@@ -305,7 +315,7 @@ async def _send_sketches_page(
     if not style_id:
         await state.clear()
         await message.answer(
-            "Не удалось открыть список эскизов. Откройте каталог заново.",
+            ClientTextService().text("catalog_open_failed"),
             reply_markup=get_main_menu_for_message(session=session, message=message),
         )
         return
@@ -316,7 +326,7 @@ async def _send_sketches_page(
     if not sketches:
         await state.clear()
         await message.answer(
-            "В этом стиле пока нет доступных эскизов.",
+            ClientTextService().text("catalog_style_empty"),
             reply_markup=get_main_menu_for_message(session=session, message=message),
         )
         return
@@ -331,7 +341,11 @@ async def _send_sketches_page(
     await state.update_data(sketch_buttons=sketch_buttons, sketch_page=page)
     await state.set_state(SketchCatalogState.choosing_sketch)
     await message.answer(
-        _build_page_text(title="Выберите эскиз", page=page, items_count=len(sketches)),
+        _build_page_text(
+            title=ClientTextService().text("catalog_choose_sketch_title"),
+            page=page,
+            items_count=len(sketches),
+        ),
         reply_markup=build_sketches_reply_keyboard(sketches=sketches, page=page),
     )
 
@@ -343,7 +357,15 @@ def _build_style_buttons(styles, page: int) -> dict[str, int]:
 
 def _build_sketch_buttons(sketches, page: int) -> dict[str, int]:
     page_sketches = _get_page_items(items=sketches, page=page)
-    return {_build_sketch_button_text(sketch): sketch.id for sketch in page_sketches}
+    duplicate_texts = get_duplicate_sketch_button_texts(page_sketches)
+
+    return {
+        build_sketch_button_text(
+            sketch=sketch,
+            disambiguate=build_sketch_button_text(sketch) in duplicate_texts,
+        ): sketch.id
+        for sketch in page_sketches
+    }
 
 
 def _get_page_items(items, page: int):
@@ -358,4 +380,9 @@ def _shift_page(current_page: int, step: int, items_count: int) -> int:
 
 def _build_page_text(title: str, page: int, items_count: int) -> str:
     last_page = max((items_count - 1) // CATALOG_PAGE_SIZE, 0)
-    return f"{title}: страница {page + 1} из {last_page + 1}"
+    return ClientTextService().format_text(
+        "catalog_page_title",
+        title=title,
+        page=str(page + 1),
+        pages=str(last_page + 1),
+    )

@@ -6,13 +6,15 @@ from db.session import SessionLocal
 from services.reminder_service import ReminderService
 from utils.logger import logger
 from utils.reminder_time import REMINDER_HOUR, REMINDER_MINUTE
+from utils.timezone import get_bot_timezone
 
 
 def start_reminder_scheduler(bot: Bot) -> AsyncIOScheduler:
-    scheduler = AsyncIOScheduler()
+    timezone = get_bot_timezone()
+    scheduler = AsyncIOScheduler(timezone=timezone)
     scheduler.add_job(
         _send_tomorrow_reminders,
-        CronTrigger(hour=REMINDER_HOUR, minute=REMINDER_MINUTE),
+        CronTrigger(hour=REMINDER_HOUR, minute=REMINDER_MINUTE, timezone=timezone),
         kwargs={"bot": bot},
         id="send_tomorrow_reminders",
         replace_existing=True,

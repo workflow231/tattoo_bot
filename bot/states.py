@@ -8,6 +8,12 @@ class SketchCatalogState(StatesGroup):
     chat_with_master = State()
 
 
+class BookingState(StatesGroup):
+    choosing_action = State()
+    choosing_custom_sketch_action = State()
+    waiting_custom_sketch_photo = State()
+
+
 class AppointmentState(StatesGroup):
     choosing_date = State()
     choosing_time = State()

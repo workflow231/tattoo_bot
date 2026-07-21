@@ -14,6 +14,7 @@ CONFIRMED_SLOT_REVISION = "7c8a91f2d4b3"
 WORKING_HOURS_REVISION = "9a7d2c4e6b10"
 BUSY_SLOT_REVISION = "0f6c2d8b9a31"
 PROCESSED_UPDATES_REVISION = "4e2b8d7f1c90"
+APPOINTMENT_REQUEST_TYPE_REVISION = "6d3e5b8a2c41"
 
 
 def main() -> None:
@@ -68,6 +69,7 @@ def baseline_legacy_sqlite_connection(connection: _SqlConnection) -> None:
     revision = _detect_existing_revision_from_sets(
         tables=tables,
         indexes=_get_sqlalchemy_indexes(connection),
+        appointment_columns=_get_sqlalchemy_columns(connection, "appointments"),
     )
 
     if not revision:
@@ -103,6 +105,11 @@ def _get_indexes(connection: sqlite3.Connection) -> set[str]:
     return {row[0] for row in rows}
 
 
+def _get_columns(connection: sqlite3.Connection, table_name: str) -> set[str]:
+    rows = connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+    return {row[1] for row in rows}
+
+
 def _detect_existing_revision(
     connection: sqlite3.Connection,
     tables: set[str],
@@ -110,12 +117,14 @@ def _detect_existing_revision(
     return _detect_existing_revision_from_sets(
         tables=tables,
         indexes=_get_indexes(connection),
+        appointment_columns=_get_columns(connection, "appointments"),
     )
 
 
 def _detect_existing_revision_from_sets(
     tables: set[str],
     indexes: set[str],
+    appointment_columns: set[str] | None = None,
 ) -> str | None:
     base_tables = {
         "schedule_exceptions",
@@ -145,6 +154,16 @@ def _detect_existing_revision_from_sets(
     if "processed_updates" in tables:
         revision = PROCESSED_UPDATES_REVISION
 
+    if (
+        "processed_updates" in tables
+        and appointment_columns
+        and {
+            "request_type",
+            "client_sketch_photo_file_id",
+        }.issubset(appointment_columns)
+    ):
+        revision = APPOINTMENT_REQUEST_TYPE_REVISION
+
     return revision
 
 
@@ -164,6 +183,11 @@ def _get_sqlalchemy_indexes(connection: _SqlConnection) -> set[str]:
             WHERE type = 'index' AND name NOT LIKE 'sqlite_%'
             """)).fetchall()
     return {row[0] for row in rows}
+
+
+def _get_sqlalchemy_columns(connection: _SqlConnection, table_name: str) -> set[str]:
+    rows = connection.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
+    return {row[1] for row in rows}
 
 
 def _run_alembic(*args: str) -> None:

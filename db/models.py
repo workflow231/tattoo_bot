@@ -144,10 +144,10 @@ class Appointment(Base):
         nullable=False,
     )
 
-    sketch_id: Mapped[int] = mapped_column(
+    sketch_id: Mapped[int | None] = mapped_column(
         ForeignKey("sketches.id"),
         index=True,
-        nullable=False,
+        nullable=True,
     )
 
     appointment_date: Mapped[date] = mapped_column(
@@ -167,6 +167,18 @@ class Appointment(Base):
         default="pending",
         index=True,
         nullable=False,
+    )
+
+    # catalog_sketch / custom_sketch / no_sketch
+    request_type: Mapped[str] = mapped_column(
+        String(30),
+        default="catalog_sketch",
+        nullable=False,
+    )
+
+    client_sketch_photo_file_id: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
     )
 
     client_comment: Mapped[str | None] = mapped_column(Text, nullable=True)

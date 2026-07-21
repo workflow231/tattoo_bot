@@ -1,3 +1,4 @@
+from aiogram.exceptions import TelegramAPIError, TelegramNetworkError
 from aiogram.types import Message, InputMediaPhoto
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +16,8 @@ from db.repositories.sketch_repo import (
     get_sketch_by_id_with_style,
     increment_sketch_views,
 )
+
+PHOTO_UNAVAILABLE_TEXT = "Фото сейчас недоступно. Можно продолжить без него."
 
 
 class SketchCatalogService:
@@ -105,11 +108,19 @@ class SketchCatalogService:
         message: Message,
         sketch: Sketch,
     ) -> None:
-        await message.answer_photo(
-            photo=sketch.photo_file_id,
-            caption=self._build_full_sketch_caption(sketch),
-            reply_markup=sketch_card_kb,
-        )
+        caption = self._build_full_sketch_caption(sketch)
+
+        try:
+            await message.answer_photo(
+                photo=sketch.photo_file_id,
+                caption=caption,
+                reply_markup=sketch_card_kb,
+            )
+        except (TelegramAPIError, TelegramNetworkError):
+            await message.answer(
+                self._build_photo_unavailable_text(caption),
+                reply_markup=sketch_card_kb,
+            )
 
     async def _build_style_cards(
         self,
@@ -139,16 +150,29 @@ class SketchCatalogService:
         if len(media) == 1:
             item = media[0]
 
-            await message.answer_photo(
-                photo=item.media,
-                caption=item.caption,
-            )
+            try:
+                await message.answer_photo(
+                    photo=item.media,
+                    caption=item.caption,
+                )
+            except (TelegramAPIError, TelegramNetworkError):
+                await message.answer(
+                    self._build_photo_unavailable_text(item.caption),
+                )
             return
 
-        await message.bot.send_media_group(
-            chat_id=message.chat.id,
-            media=media,
-        )
+        try:
+            await message.bot.send_media_group(
+                chat_id=message.chat.id,
+                media=media,
+            )
+        except (TelegramAPIError, TelegramNetworkError):
+            captions = [item.caption for item in media if item.caption]
+            await message.answer(
+                "Не удалось показать фото.\n\n"
+                + "\n\n".join(captions)
+                + f"\n\n{PHOTO_UNAVAILABLE_TEXT}",
+            )
 
     def _build_short_sketch_caption(self, sketch: Sketch) -> str:
         price = f"от {sketch.price} ₽" if sketch.price else "договорная"
@@ -168,6 +192,12 @@ class SketchCatalogService:
             f"Статус: {status}\n"
             f"Описание: {description}"
         )
+
+    def _build_photo_unavailable_text(self, caption: str | None) -> str:
+        if not caption:
+            return PHOTO_UNAVAILABLE_TEXT
+
+        return f"{caption}\n\n{PHOTO_UNAVAILABLE_TEXT}"
 
     def _format_status(self, status: str) -> str:
         statuses = {

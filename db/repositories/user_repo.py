@@ -43,6 +43,11 @@ async def get_or_create_user(
     user = await get_user_by_telegram_id(session, telegram_id)
 
     if user:
+        await _update_username_if_changed(
+            session=session,
+            user=user,
+            username=username,
+        )
         return user, False
 
     try:
@@ -56,11 +61,29 @@ async def get_or_create_user(
         user = await get_user_by_telegram_id(session, telegram_id)
 
         if user:
+            await _update_username_if_changed(
+                session=session,
+                user=user,
+                username=username,
+            )
             return user, False
 
         raise
 
     return user, True
+
+
+async def _update_username_if_changed(
+    session: AsyncSession,
+    user: User,
+    username: str | None,
+) -> None:
+    if user.username == username:
+        return
+
+    user.username = username
+    await session.commit()
+    await session.refresh(user)
 
 
 async def check_user_is_admin(

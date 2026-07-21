@@ -94,6 +94,20 @@ class AdminAppointmentService:
 
         return self.build_client_contact_text(appointment)
 
+    async def get_client_sketch_photo_file_id(
+        self,
+        appointment_id: int,
+    ) -> str | None:
+        appointment = await find_appointment_by_id(
+            session=self.session,
+            appointment_id=appointment_id,
+        )
+
+        if not appointment:
+            return None
+
+        return appointment.client_sketch_photo_file_id
+
     async def confirm_appointment(
         self,
         appointment_id: int,
@@ -210,7 +224,9 @@ class AdminAppointmentService:
     def build_admin_card_text(self, appointment: Appointment) -> str:
         username = self._format_username(appointment)
         telegram_id = appointment.user.telegram_id if appointment.user else "Не указан"
-        sketch_name = appointment.sketch.name if appointment.sketch else "Не указан"
+        sketch_name = self.appointment_formatter.get_appointment_sketch_name(
+            appointment
+        )
         comment = appointment.client_comment or "Не указан"
 
         return (
@@ -225,7 +241,9 @@ class AdminAppointmentService:
         )
 
     def build_confirmed_client_message(self, appointment: Appointment) -> str:
-        sketch_name = appointment.sketch.name if appointment.sketch else "Не указан"
+        sketch_name = self.appointment_formatter.get_appointment_sketch_name(
+            appointment
+        )
 
         return ClientTextService().appointment_confirmed(
             appointment_date=appointment.appointment_date.strftime(DATE_FORMAT),

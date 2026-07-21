@@ -14,8 +14,11 @@ from bot.keyboards import (
     ADMIN_REJECT_APPOINTMENT_BUTTON,
     ADMIN_REJECTED_APPOINTMENTS_BUTTON,
     ADMIN_WRITE_CLIENT_BUTTON,
+    APPOINTMENT_LIST_PAGE_SIZE,
     BACK_BUTTON,
     MAIN_MENU_BUTTON,
+    NEXT_PAGE_BUTTON,
+    PREVIOUS_PAGE_BUTTON,
     build_admin_appointment_card_keyboard,
     build_admin_appointment_filters_keyboard,
     build_admin_appointments_keyboard,
@@ -106,6 +109,31 @@ async def choose_admin_appointment(
 
     data = await state.get_data()
     appointment_buttons: dict[str, int] = data.get("admin_appointment_buttons", {})
+
+    if message.text in {PREVIOUS_PAGE_BUTTON, NEXT_PAGE_BUTTON}:
+        filter_text = data.get("admin_appointment_filter")
+
+        if not filter_text:
+            await state.set_state(AdminAppointmentState.choosing_filter)
+            await message.answer(
+                "Выберите список заявок:",
+                reply_markup=build_admin_appointment_filters_keyboard(),
+            )
+            return
+
+        await _send_admin_appointments_list(
+            session=session,
+            message=message,
+            state=state,
+            filter_text=filter_text,
+            page=_shift_page(
+                current_page=int(data.get("admin_appointment_page", 0)),
+                step=-1 if message.text == PREVIOUS_PAGE_BUTTON else 1,
+                items_count=int(data.get("admin_appointment_count", 0)),
+            ),
+        )
+        return
+
     appointment_id = appointment_buttons.get(message.text or "")
 
     if not appointment_id:
@@ -121,9 +149,11 @@ async def choose_admin_appointment(
 
     await state.update_data(selected_admin_appointment_id=appointment_id)
     await state.set_state(AdminAppointmentState.viewing_appointment)
-    await message.answer(
-        card_text,
-        reply_markup=build_admin_appointment_card_keyboard(),
+    await _send_admin_appointment_card(
+        message=message,
+        service=service,
+        appointment_id=int(appointment_id),
+        card_text=card_text,
     )
 
 
@@ -158,6 +188,7 @@ async def view_admin_appointment_action(
             message=message,
             state=state,
             filter_text=filter_text,
+            page=int(data.get("admin_appointment_page", 0)),
         )
         return
 
@@ -251,9 +282,11 @@ async def _handle_admin_appointment_action(
     card_text = await service.get_appointment_card(appointment_id=appointment_id)
 
     if card_text:
-        await message.answer(
-            admin_message + "\n\n" + card_text,
-            reply_markup=build_admin_appointment_card_keyboard(),
+        await _send_admin_appointment_card(
+            message=message,
+            service=service,
+            appointment_id=int(appointment_id),
+            card_text=admin_message + "\n\n" + card_text,
         )
         return
 
@@ -277,11 +310,41 @@ async def _send_client_notification(
     return True
 
 
+async def _send_admin_appointment_card(
+    message: Message,
+    service: AdminAppointmentService,
+    appointment_id: int,
+    card_text: str,
+) -> None:
+    await message.answer(
+        card_text,
+        reply_markup=build_admin_appointment_card_keyboard(),
+    )
+
+    photo_file_id = await service.get_client_sketch_photo_file_id(
+        appointment_id=appointment_id,
+    )
+
+    if photo_file_id:
+        try:
+            await message.answer_photo(
+                photo=photo_file_id,
+                caption="Эскиз клиента",
+                reply_markup=build_admin_appointment_card_keyboard(),
+            )
+        except (TelegramAPIError, TelegramNetworkError):
+            await message.answer(
+                "Фото эскиза клиента сейчас недоступно.",
+                reply_markup=build_admin_appointment_card_keyboard(),
+            )
+
+
 async def _send_admin_appointments_list(
     session: AsyncSession,
     message: Message,
     state: FSMContext,
     filter_text: str,
+    page: int = 0,
 ) -> None:
     service = AdminAppointmentService(session=session)
     appointments = await service.list_appointments_by_filter(filter_text=filter_text)
@@ -296,17 +359,28 @@ async def _send_admin_appointments_list(
         )
         return
 
+    page = _normalize_page(page=page, items_count=len(appointments))
+    page_appointments = _get_page_items(appointments, page=page)
     appointment_buttons = {
-        f"Открыть #{appointment.id}": appointment.id for appointment in appointments
+        f"Открыть #{appointment.id}": appointment.id
+        for appointment in page_appointments
     }
 
-    await state.update_data(admin_appointment_buttons=appointment_buttons)
+    await state.update_data(
+        admin_appointment_buttons=appointment_buttons,
+        admin_appointment_page=page,
+        admin_appointment_count=len(appointments),
+    )
     await state.set_state(AdminAppointmentState.choosing_appointment)
     await message.answer(
         service.build_admin_list_title(filter_text)
         + "\n\n"
-        + "\n".join(appointment.text for appointment in appointments),
-        reply_markup=build_admin_appointments_keyboard(appointments),
+        + _build_paginated_list_text(
+            items=[appointment.text for appointment in page_appointments],
+            page=page,
+            items_count=len(appointments),
+        ),
+        reply_markup=build_admin_appointments_keyboard(appointments, page=page),
     )
 
 
@@ -328,3 +402,30 @@ def _message_from_admin(session: AsyncSession, message: Message) -> bool:
 
     service = AdminAppointmentService(session=session)
     return service.is_admin(telegram_id=message.from_user.id)
+
+
+def _get_page_items(items, page: int):
+    start = page * APPOINTMENT_LIST_PAGE_SIZE
+    return items[start : start + APPOINTMENT_LIST_PAGE_SIZE]
+
+
+def _normalize_page(page: int, items_count: int) -> int:
+    last_page = max((items_count - 1) // APPOINTMENT_LIST_PAGE_SIZE, 0)
+    return min(max(page, 0), last_page)
+
+
+def _shift_page(current_page: int, step: int, items_count: int) -> int:
+    return _normalize_page(page=current_page + step, items_count=items_count)
+
+
+def _build_paginated_list_text(
+    items: list[str],
+    page: int,
+    items_count: int,
+) -> str:
+    last_page = max((items_count - 1) // APPOINTMENT_LIST_PAGE_SIZE, 0)
+
+    if last_page == 0:
+        return "\n".join(items)
+
+    return f"Страница {page + 1} из {last_page + 1}\n" + "\n".join(items)

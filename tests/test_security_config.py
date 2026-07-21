@@ -7,6 +7,7 @@ from utils.config import (
     get_bool_env,
     get_int_env,
     get_required_env,
+    get_timezone_name_env,
 )
 
 
@@ -40,6 +41,12 @@ def test_get_int_env_rejects_non_integer(monkeypatch) -> None:
 
     with pytest.raises(RuntimeError, match="WEBHOOK_PORT must be an integer"):
         get_int_env("WEBHOOK_PORT", 8080)
+
+
+def test_timezone_name_uses_default_for_empty_env(monkeypatch) -> None:
+    monkeypatch.setenv("BOT_TIMEZONE", " ")
+
+    assert get_timezone_name_env() == "Europe/Moscow"
 
 
 def test_webhook_path_must_start_with_slash(monkeypatch) -> None:

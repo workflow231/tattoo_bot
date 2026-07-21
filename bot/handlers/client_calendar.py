@@ -6,6 +6,7 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.keyboards import (
+    BACK_BUTTON,
     CLIENT_CALENDAR_BUTTON,
     CLIENT_CALENDAR_CALLBACK_PREFIX,
     CLIENT_CALENDAR_IGNORE_CALLBACK,
@@ -16,6 +17,8 @@ from bot.keyboards import (
 )
 from bot.states import ClientCalendarState
 from services.appointment_service import DATE_FORMAT, AppointmentService
+from services.client_text_service import ClientTextService
+from utils.timezone import today_in_bot_timezone
 
 router = Router()
 
@@ -28,11 +31,11 @@ async def show_client_calendar(
 ):
     await state.clear()
     await message.answer(
-        "Календарь мастера открыт.",
+        ClientTextService().text("client_calendar_opened"),
         reply_markup=build_back_main_keyboard(),
     )
 
-    today = date.today()
+    today = today_in_bot_timezone()
     await _send_client_calendar_month(
         session=session,
         message=message,
@@ -47,12 +50,15 @@ async def client_calendar_navigation(
     message: Message,
     state: FSMContext,
 ):
-    if message.text in {MAIN_MENU_BUTTON, "⬅️ Назад"}:
+    if message.text in {MAIN_MENU_BUTTON, BACK_BUTTON}:
         await state.clear()
-        await message.answer("Главное меню", reply_markup=client_menu_kb)
+        await message.answer(
+            ClientTextService().text("main_menu"),
+            reply_markup=client_menu_kb,
+        )
         return
 
-    await message.answer("Используйте inline-кнопки календаря.")
+    await message.answer(ClientTextService().text("client_calendar_use_inline_buttons"))
 
 
 @router.callback_query(F.data.startswith(f"{CLIENT_CALENDAR_CALLBACK_PREFIX}:"))
@@ -70,17 +76,29 @@ async def handle_client_calendar_callback(
     action = parts[1] if len(parts) > 1 else ""
 
     if action == "month" and len(parts) == 4:
+        calendar_month = _parse_callback_month(parts[2], parts[3])
+
+        if not calendar_month:
+            await _answer_invalid_client_calendar_callback(callback)
+            return
+
+        year, month = calendar_month
         await _edit_client_calendar_month(
             session=session,
             callback=callback,
             state=state,
-            year=int(parts[2]),
-            month=int(parts[3]),
+            year=year,
+            month=month,
         )
         return
 
     if action == "day" and len(parts) == 3:
-        appointment_date = date.fromisoformat(parts[2])
+        appointment_date = _parse_callback_date(parts[2])
+
+        if not appointment_date:
+            await _answer_invalid_client_calendar_callback(callback)
+            return
+
         service = AppointmentService(session=session)
         availability = await service.get_date_availability(
             appointment_date=appointment_date,
@@ -88,7 +106,8 @@ async def handle_client_calendar_callback(
 
         if not availability.available:
             await callback.answer(
-                availability.message or "На эту дату свободных слотов нет.",
+                availability.message
+                or ClientTextService().text("client_calendar_no_slots"),
                 show_alert=True,
             )
             return
@@ -100,15 +119,23 @@ async def handle_client_calendar_callback(
         if available_times:
             await callback.answer()
             await callback.message.answer(
-                f"{appointment_date.strftime(DATE_FORMAT)}\n\n"
-                "Свободные слоты:\n"
-                + "\n".join(available_times)
-                + "\n\nЗапись создаётся через карточку эскиза.",
+                ClientTextService().format_text(
+                    "client_calendar_day_slots",
+                    appointment_date=appointment_date.strftime(DATE_FORMAT),
+                    available_times="\n".join(available_times),
+                ),
                 reply_markup=build_back_main_keyboard(),
             )
             return
 
-        await callback.answer("На эту дату свободных слотов нет.", show_alert=True)
+        await callback.answer(
+            ClientTextService().text("client_calendar_no_slots"),
+            show_alert=True,
+        )
+        return
+
+    if action in {"month", "day"}:
+        await _answer_invalid_client_calendar_callback(callback)
         return
 
     await callback.answer()
@@ -179,8 +206,32 @@ async def _edit_client_calendar_month(
 
 
 def _build_client_calendar_text(title: str) -> str:
-    return (
-        f"Календарь мастера: {title}\n\n"
-        "Можно посмотреть свободные слоты.\n"
-        "Запись создаётся только через выбранный эскиз."
+    return ClientTextService().format_text(
+        "client_calendar_month",
+        month_title=title,
     )
+
+
+async def _answer_invalid_client_calendar_callback(callback: CallbackQuery) -> None:
+    await callback.answer(
+        ClientTextService().stale_session(),
+        show_alert=True,
+    )
+
+
+def _parse_callback_month(year_text: str, month_text: str) -> tuple[int, int] | None:
+    try:
+        year = int(year_text)
+        month = int(month_text)
+        date(year, month, 1)
+    except ValueError:
+        return None
+
+    return year, month
+
+
+def _parse_callback_date(value: str) -> date | None:
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None

@@ -7,10 +7,12 @@ from scripts.migrate import (
     BUSY_SLOT_REVISION,
     CONFIRMED_SLOT_REVISION,
     INITIAL_REVISION,
+    APPOINTMENT_REQUEST_TYPE_REVISION,
     PROCESSED_UPDATES_REVISION,
     WEEKLY_DAY_OFFS_REVISION,
     WORKING_HOURS_REVISION,
     _detect_existing_revision,
+    _get_indexes,
     _get_tables,
     baseline_legacy_sqlite_connection,
 )
@@ -91,6 +93,45 @@ def test_detects_processed_updates_revision():
     )
 
 
+def test_detects_appointment_request_type_revision():
+    connection = sqlite3.connect(":memory:")
+    _create_base_tables(connection)
+    connection.execute("CREATE TABLE processed_updates (update_id INTEGER PRIMARY KEY)")
+    connection.execute(
+        "ALTER TABLE appointments ADD COLUMN request_type VARCHAR(30) "
+        "NOT NULL DEFAULT 'catalog_sketch'"
+    )
+    connection.execute(
+        "ALTER TABLE appointments ADD COLUMN client_sketch_photo_file_id VARCHAR(255)"
+    )
+
+    assert (
+        _detect_existing_revision(connection, _get_tables(connection))
+        == APPOINTMENT_REQUEST_TYPE_REVISION
+    )
+
+
+def test_request_type_columns_do_not_skip_processed_updates_revision():
+    connection = sqlite3.connect(":memory:")
+    _create_base_tables(connection)
+    connection.execute("""
+        CREATE UNIQUE INDEX ux_appointments_busy_slot
+        ON appointments (appointment_date, appointment_time)
+        """)
+    connection.execute(
+        "ALTER TABLE appointments ADD COLUMN request_type VARCHAR(30) "
+        "NOT NULL DEFAULT 'catalog_sketch'"
+    )
+    connection.execute(
+        "ALTER TABLE appointments ADD COLUMN client_sketch_photo_file_id VARCHAR(255)"
+    )
+
+    assert (
+        _detect_existing_revision(connection, _get_tables(connection))
+        == BUSY_SLOT_REVISION
+    )
+
+
 def test_unknown_schema_is_not_stamped():
     connection = sqlite3.connect(":memory:")
     connection.execute("CREATE TABLE users (id INTEGER PRIMARY KEY)")
@@ -113,6 +154,32 @@ def test_baseline_legacy_sqlite_connection_creates_alembic_version():
     assert revision == INITIAL_REVISION
 
 
+def test_baseline_legacy_sqlite_connection_stamps_request_type_revision():
+    engine = create_engine("sqlite:///:memory:")
+
+    with engine.begin() as connection:
+        raw_connection = connection.connection.driver_connection
+        _create_base_tables(raw_connection)
+        raw_connection.execute(
+            "CREATE TABLE processed_updates (update_id INTEGER PRIMARY KEY)"
+        )
+        raw_connection.execute(
+            "ALTER TABLE appointments ADD COLUMN request_type VARCHAR(30) "
+            "NOT NULL DEFAULT 'catalog_sketch'"
+        )
+        raw_connection.execute(
+            "ALTER TABLE appointments ADD COLUMN client_sketch_photo_file_id VARCHAR(255)"
+        )
+
+        baseline_legacy_sqlite_connection(connection)
+
+        revision = connection.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
+
+    assert revision == APPOINTMENT_REQUEST_TYPE_REVISION
+
+
 def test_alembic_upgrade_handles_existing_legacy_tables(tmp_path):
     db_path = tmp_path / "legacy.db"
     connection = sqlite3.connect(db_path)
@@ -130,13 +197,21 @@ def test_alembic_upgrade_handles_existing_legacy_tables(tmp_path):
 
     connection = sqlite3.connect(db_path)
     tables = _get_tables(connection)
+    indexes = _get_indexes(connection)
+    appointment_columns = {
+        row[1]: row for row in connection.execute("PRAGMA table_info(appointments)")
+    }
     revision = connection.execute("SELECT version_num FROM alembic_version").fetchone()[
         0
     ]
     connection.close()
 
     assert "processed_updates" in tables
-    assert revision == PROCESSED_UPDATES_REVISION
+    assert "ux_appointments_busy_slot" in indexes
+    assert appointment_columns["sketch_id"][3] == 0
+    assert appointment_columns["request_type"][3] == 1
+    assert "client_sketch_photo_file_id" in appointment_columns
+    assert revision == APPOINTMENT_REQUEST_TYPE_REVISION
 
 
 def _create_base_tables(connection: sqlite3.Connection) -> None:

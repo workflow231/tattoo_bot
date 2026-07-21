@@ -10,6 +10,7 @@ from bot.keyboards import get_main_menu
 from db.session import SessionLocal
 
 from utils.logger import logger
+from utils.config import get_admin_ids_from_env
 
 router = Router()
 
@@ -24,12 +25,13 @@ async def cmd_start(message: Message, state: FSMContext):
     async with SessionLocal() as session:
         user_service = UserService(session)
 
-        user, created = await user_service.register_or_get_user(
+        _, created = await user_service.register_or_get_user(
             telegram_id=telegram_id,
             username=username,
         )
 
-    reply_markup = get_main_menu(is_admin=user.is_admin)
+    is_admin = telegram_id in get_admin_ids_from_env()
+    reply_markup = get_main_menu(is_admin=is_admin)
     client_texts = ClientTextService()
 
     if created:

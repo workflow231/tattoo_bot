@@ -24,6 +24,7 @@ from bot.keyboards import (
 from bot.states import AdminWorkingHoursState
 from services.admin_appointment_service import AdminAppointmentService
 from services.working_hours_service import WorkingHoursService
+from utils.timezone import today_in_bot_timezone
 
 router = Router()
 
@@ -185,7 +186,7 @@ async def collect_working_hours_date(
     service = WorkingHoursService(session=session)
     working_date = service.parse_date(message.text)
 
-    if not working_date or working_date < date.today():
+    if not working_date or working_date < today_in_bot_timezone():
         await message.answer("Введите будущую дату в формате ДД.ММ.ГГГГ.")
         return
 

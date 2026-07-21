@@ -1,4 +1,5 @@
 from unittest.mock import AsyncMock
+from datetime import date, time
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -66,6 +67,15 @@ async def test_confirm_appointment_handles_unique_slot_violation(monkeypatch) ->
     assert result.admin_message == "Этот слот уже занят другой подтверждённой заявкой."
 
 
+def test_admin_card_formats_custom_sketch_request() -> None:
+    appointment = _appointment(status="pending")
+    appointment.request_type = "custom_sketch"
+
+    card_text = AdminAppointmentService(session=None).build_admin_card_text(appointment)
+
+    assert "Эскиз: Мой эскиз — цена договорная" in card_text
+
+
 def _appointment(status: str):
     return type(
         "AppointmentStub",
@@ -75,5 +85,10 @@ def _appointment(status: str):
             "status": status,
             "user": None,
             "sketch": None,
+            "request_type": "catalog_sketch",
+            "client_sketch_photo_file_id": None,
+            "appointment_date": date(2026, 7, 13),
+            "appointment_time": time(12, 0),
+            "client_comment": None,
         },
     )()

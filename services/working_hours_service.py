@@ -28,6 +28,7 @@ from utils.admin_calendar import format_weekday_name
 
 DATE_FORMAT = "%d.%m.%Y"
 TIME_FORMAT = "%H:%M"
+TIME_CALCULATION_DATE = date(2000, 1, 1)
 
 WEEKDAY_BUTTONS = {
     "Понедельник": 0,
@@ -284,8 +285,8 @@ class WorkingHoursService:
         working_hours: WeeklyWorkingHours | TemporaryWorkingHours,
     ) -> list[str]:
         result = []
-        current_dt = datetime.combine(date.today(), working_hours.start_time)
-        end_dt = datetime.combine(date.today(), working_hours.end_time)
+        current_dt = datetime.combine(TIME_CALCULATION_DATE, working_hours.start_time)
+        end_dt = datetime.combine(TIME_CALCULATION_DATE, working_hours.end_time)
         step = timedelta(minutes=working_hours.slot_step_minutes)
 
         while current_dt <= end_dt:
@@ -350,6 +351,6 @@ class WorkingHoursService:
         ]
 
     def _minutes_between(self, start_time: time, end_time: time) -> int:
-        start_dt = datetime.combine(date.today(), start_time)
-        end_dt = datetime.combine(date.today(), end_time)
+        start_dt = datetime.combine(TIME_CALCULATION_DATE, start_time)
+        end_dt = datetime.combine(TIME_CALCULATION_DATE, end_time)
         return int((end_dt - start_dt).total_seconds() // 60)
