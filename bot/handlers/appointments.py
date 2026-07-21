@@ -36,6 +36,7 @@ from services.appointment_service import (
     AppointmentDraft,
     AppointmentService,
 )
+from services.client_text_service import ClientTextService
 from services.master_contact_service import MasterContactService
 
 router = Router()
@@ -401,8 +402,7 @@ async def confirm_appointment_creation(
 
     await state.clear()
     await message.answer(
-        "Заявка создана и ожидает подтверждения.\n\n"
-        "После разговора с мастером админ подтвердит или отклонит заявку.",
+        ClientTextService().appointment_created(),
         reply_markup=client_menu_kb,
     )
 

@@ -2,6 +2,7 @@ from db.models import Sketch, Style
 from bot.keyboards import (
     ADD_SKETCH_BUTTON,
     ADMIN_SKETCHES_BUTTON,
+    CATALOG_BUTTON,
     CHAT_WITH_MASTER_BUTTON,
     CREATE_REQUEST_BUTTON,
     DELETE_SKETCH_BUTTON,
@@ -20,6 +21,7 @@ from bot.keyboards import (
     build_admin_sketch_edit_fields_keyboard,
     build_sketches_reply_keyboard,
     build_styles_reply_keyboard,
+    client_menu_kb,
     master_menu_kb,
     sketch_card_kb,
 )
@@ -67,6 +69,13 @@ def test_sketches_keyboard_paginates_after_ten_items() -> None:
 
 def test_master_menu_does_not_show_chat_with_master() -> None:
     assert CHAT_WITH_MASTER_BUTTON not in _keyboard_texts(master_menu_kb)
+
+
+def test_main_menus_show_booking_entry() -> None:
+    assert CATALOG_BUTTON in _keyboard_texts(client_menu_kb)
+    assert CATALOG_BUTTON in _keyboard_texts(master_menu_kb)
+    assert "Каталог эскизов" not in _keyboard_texts(client_menu_kb)
+    assert "Каталог эскизов" not in _keyboard_texts(master_menu_kb)
 
 
 def test_master_menu_shows_sketches_section_instead_of_direct_add_button() -> None:
