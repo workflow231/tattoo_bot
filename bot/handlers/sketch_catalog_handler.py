@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.keyboards import (
     BACK_BUTTON,
+    CATALOG_BUTTON,
     CATALOG_PAGE_SIZE,
     CHAT_WITH_MASTER_BUTTON,
     MAIN_MENU_BUTTON,
@@ -22,7 +23,7 @@ from bot.states import SketchCatalogState
 router = Router()
 
 
-@router.message(F.text == "Каталог эскизов")
+@router.message(F.text == CATALOG_BUTTON)
 async def sketch_catalog(
     message: Message,
     state: FSMContext,

@@ -1,14 +1,14 @@
 import os
 
+from services.client_text_service import ClientTextService
+
 
 class MasterContactService:
     def get_contact_text(self) -> str:
         contact = os.getenv("MASTER_CONTACT", "").strip()
+        client_texts = ClientTextService()
 
         if not contact:
-            return (
-                "Контакт мастера пока не указан.\n\n"
-                "Попробуйте написать позже или дождитесь ответа по заявке."
-            )
+            return client_texts.master_contact_missing()
 
-        return f"Связаться с мастером:\n\n{contact}"
+        return client_texts.master_contact(contact=contact)

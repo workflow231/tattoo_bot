@@ -9,6 +9,7 @@ from db.repositories.appointment_repo import (
     list_tomorrow_confirmed_without_reminder,
     mark_reminder_sent,
 )
+from services.client_text_service import ClientTextService
 from services.appointment_service import DATE_FORMAT, TIME_FORMAT
 
 
@@ -59,11 +60,8 @@ class ReminderService:
     def build_reminder_text(self, appointment: Appointment) -> str:
         sketch_name = appointment.sketch.name if appointment.sketch else "Не указан"
 
-        return (
-            "Напоминание о записи\n\n"
-            "Завтра у вас сеанс тату.\n\n"
-            f"Дата: {appointment.appointment_date.strftime(DATE_FORMAT)}\n"
-            f"Время: {appointment.appointment_time.strftime(TIME_FORMAT)}\n"
-            f"Эскиз: {sketch_name}\n\n"
-            "Если планы изменились — напишите мастеру заранее."
+        return ClientTextService().reminder_tomorrow(
+            appointment_date=appointment.appointment_date.strftime(DATE_FORMAT),
+            appointment_time=appointment.appointment_time.strftime(TIME_FORMAT),
+            sketch_name=sketch_name,
         )

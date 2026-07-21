@@ -14,6 +14,7 @@ from db.repositories.appointment_repo import (
     list_appointments,
 )
 from services.appointment_service import DATE_FORMAT, TIME_FORMAT, AppointmentService
+from services.client_text_service import ClientTextService
 from utils.config import get_admin_ids_from_env
 
 ADMIN_STATUS_FILTERS = {
@@ -226,19 +227,14 @@ class AdminAppointmentService:
     def build_confirmed_client_message(self, appointment: Appointment) -> str:
         sketch_name = appointment.sketch.name if appointment.sketch else "Не указан"
 
-        return (
-            "Ваша заявка подтверждена.\n\n"
-            f"Дата: {appointment.appointment_date.strftime(DATE_FORMAT)}\n"
-            f"Время: {appointment.appointment_time.strftime(TIME_FORMAT)}\n"
-            f"Эскиз: {sketch_name}\n\n"
-            "За день до записи бот пришлёт напоминание."
+        return ClientTextService().appointment_confirmed(
+            appointment_date=appointment.appointment_date.strftime(DATE_FORMAT),
+            appointment_time=appointment.appointment_time.strftime(TIME_FORMAT),
+            sketch_name=sketch_name,
         )
 
     def build_rejected_client_message(self) -> str:
-        return (
-            "Ваша заявка отклонена.\n\n"
-            "Свяжитесь с мастером, чтобы выбрать другую дату или уточнить детали."
-        )
+        return ClientTextService().appointment_rejected()
 
     def build_client_contact_text(self, appointment: Appointment) -> str:
         if not appointment.user:

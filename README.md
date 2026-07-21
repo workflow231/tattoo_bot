@@ -14,7 +14,7 @@ Aiogram Telegram bot for tattoo sketch requests.
 
 ## Main Flows
 
-- Clients can browse sketches, view the master calendar, create requests from a sketch card, see their requests, and contact the master.
+- Clients start booking from the `Запись` button, browse sketches, view the master calendar, create requests from a sketch card, see their requests, and contact the master.
 - The client calendar is view-only: booking still starts from a selected sketch.
 - The master can view appointments, manage the appointment calendar, and add new sketches.
 - When adding a sketch, the master chooses or creates a style, fills sketch fields, reviews the summary, and saves it.
@@ -59,6 +59,40 @@ public `WEBHOOK_URL` and forward requests to the bot service.
 
 SQLite data is stored in the `tattoo_bot_data` Docker volume at
 `/app/data/tattoo_bot.db`. Redis data is stored in the `redis_data` volume.
+
+## Client Texts
+
+Client-facing text can be customized in `config/client_texts.json`. The file is
+loaded by the bot on startup/use and already contains the default texts.
+
+Supported keys:
+
+- `welcome_new_user`
+- `welcome_existing_user`
+- `master_contact`
+- `master_contact_missing`
+- `appointment_created`
+- `appointment_confirmed`
+- `appointment_rejected`
+- `reminder_tomorrow`
+- `stale_session`
+
+Allowed placeholders:
+
+- `master_contact`: `{contact}`
+- `appointment_confirmed`: `{appointment_date}`, `{appointment_time}`,
+  `{sketch_name}`
+- `reminder_tomorrow`: `{appointment_date}`, `{appointment_time}`,
+  `{sketch_name}`
+
+Limitations:
+
+- Telegram messages are limited to 4096 characters.
+- Empty, too long, missing, or invalid text values fall back to built-in defaults.
+- Do not use unknown placeholders or positional placeholders such as `{}`.
+- HTML/Markdown parse mode is not enabled for custom texts.
+- Do not put tokens, passwords, webhook secrets, or Tailscale auth keys in this
+  file.
 
 ## Useful Commands
 

@@ -11,6 +11,7 @@ from db.models import Style, Sketch
 
 BACK_BUTTON = "⬅️ Назад"
 MAIN_MENU_BUTTON = "🏠 Главное меню"
+CATALOG_BUTTON = "Запись"
 
 CREATE_REQUEST_BUTTON = "📝 Создать заявку"
 CHAT_WITH_MASTER_BUTTON = "👨‍🎨 Чат с мастером"
@@ -843,7 +844,7 @@ sketch_card_kb = ReplyKeyboardMarkup(
 client_menu_kb = ReplyKeyboardMarkup(
     keyboard=[
         [
-            KeyboardButton(text="Каталог эскизов"),
+            KeyboardButton(text=CATALOG_BUTTON),
             KeyboardButton(text=CLIENT_CALENDAR_BUTTON),
         ],
         [
@@ -859,7 +860,7 @@ client_menu_kb = ReplyKeyboardMarkup(
 master_menu_kb = ReplyKeyboardMarkup(
     keyboard=[
         [
-            KeyboardButton(text="Каталог эскизов"),
+            KeyboardButton(text=CATALOG_BUTTON),
             KeyboardButton(text=CALENDAR_BUTTON),
         ],
         [

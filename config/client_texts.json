@@ -1,0 +1,12 @@
+{
+  "_description": "Кастомные клиентские тексты. Ограничения: каждое сообщение до 4096 символов; неизвестные или позиционные placeholders вроде {} не использовать; если шаблон пустой, слишком длинный или некорректный, бот возьмёт дефолт из кода. Доступные placeholders: master_contact={contact}; appointment_confirmed/reminder_tomorrow={appointment_date}, {appointment_time}, {sketch_name}. HTML/Markdown-разметка не включена.",
+  "welcome_new_user": "Добро пожаловать!",
+  "welcome_existing_user": "С возвращением!",
+  "master_contact": "Связаться с мастером:\n\n{contact}",
+  "master_contact_missing": "Контакт мастера пока не указан.\n\nПопробуйте написать позже или дождитесь ответа по заявке.",
+  "appointment_created": "Заявка создана и ожидает подтверждения.\n\nПосле разговора с мастером админ подтвердит или отклонит заявку.",
+  "appointment_confirmed": "Ваша заявка подтверждена.\n\nДата: {appointment_date}\nВремя: {appointment_time}\nЭскиз: {sketch_name}\n\nЗа день до записи бот пришлёт напоминание.",
+  "appointment_rejected": "Ваша заявка отклонена.\n\nСвяжитесь с мастером, чтобы выбрать другую дату или уточнить детали.",
+  "reminder_tomorrow": "Напоминание о записи\n\nЗавтра у вас сеанс тату.\n\nДата: {appointment_date}\nВремя: {appointment_time}\nЭскиз: {sketch_name}\n\nЕсли планы изменились — напишите мастеру заранее.",
+  "stale_session": "Сессия устарела. Откройте нужный раздел заново."
+}

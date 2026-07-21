@@ -1,11 +1,8 @@
 import pytest
 
-from bot.handlers.menu import (
-    STALE_SESSION_TEXT,
-    handle_stale_reply_keyboard,
-    show_main_menu,
-)
+from bot.handlers.menu import handle_stale_reply_keyboard, show_main_menu
 from bot.keyboards import BACK_BUTTON, MAIN_MENU_BUTTON, client_menu_kb, master_menu_kb
+from services.client_text_service import ClientTextService
 
 
 class FakeUser:
@@ -66,4 +63,4 @@ async def test_stale_context_button_reports_expired_session(monkeypatch) -> None
     await handle_stale_reply_keyboard(message=message, state=state, session=None)
 
     assert state.clear_called is True
-    assert message.answers == [(STALE_SESSION_TEXT, client_menu_kb)]
+    assert message.answers == [(ClientTextService().stale_session(), client_menu_kb)]

@@ -5,11 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.keyboards import BACK_BUTTON, CHAT_WITH_MASTER_BUTTON, MAIN_MENU_BUTTON
 from bot.menu_utils import get_main_menu_for_message
+from services.client_text_service import ClientTextService
 from services.master_contact_service import MasterContactService
 
 router = Router()
-
-STALE_SESSION_TEXT = "Сессия устарела. Откройте нужный раздел заново."
 
 
 @router.message(F.text == CHAT_WITH_MASTER_BUTTON)
@@ -45,7 +44,11 @@ async def handle_stale_reply_keyboard(
     session: AsyncSession,
 ) -> None:
     await state.clear()
-    text = "Главное меню" if message.text == BACK_BUTTON else STALE_SESSION_TEXT
+    text = (
+        "Главное меню"
+        if message.text == BACK_BUTTON
+        else ClientTextService().stale_session()
+    )
     await message.answer(
         text,
         reply_markup=get_main_menu_for_message(session=session, message=message),
