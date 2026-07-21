@@ -31,8 +31,51 @@ def test_admin_sketch_service_builds_summary() -> None:
     assert "Стиль: Графика" in text
     assert "Название: Линии" in text
     assert "Цена: договорная" in text
+    assert "Фото: не задано" in text
     assert "Статус: доступен" in text
     assert "Просмотры" not in text
+
+
+def test_admin_sketch_service_summary_hides_photo_file_id() -> None:
+    service = AdminSketchService(session=None)
+    draft = SketchDraft(
+        style_id=1,
+        style_name="Графика",
+        name="Линии",
+        description=None,
+        price=None,
+        photo_file_id="secret-photo-file-id",
+        status="available",
+    )
+
+    text = service.build_summary_text(draft)
+
+    assert "Фото: задано" in text
+    assert "secret-photo-file-id" not in text
+    assert "Фото file_id" not in text
+
+
+def test_admin_sketch_service_card_hides_photo_file_id() -> None:
+    service = AdminSketchService(session=None)
+    sketch = type(
+        "SketchStub",
+        (),
+        {
+            "id": 7,
+            "style": type("StyleStub", (), {"name": "Графика"})(),
+            "name": "Линии",
+            "description": None,
+            "price": None,
+            "photo_file_id": "secret-photo-file-id",
+            "status": "available",
+        },
+    )()
+
+    text = service.build_sketch_card_text(sketch)
+
+    assert "Фото: задано" in text
+    assert "secret-photo-file-id" not in text
+    assert "Фото file_id" not in text
 
 
 @pytest.mark.anyio

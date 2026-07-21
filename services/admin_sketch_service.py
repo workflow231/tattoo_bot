@@ -265,7 +265,7 @@ class AdminSketchService:
     def build_summary_text(self, draft: SketchDraft) -> str:
         description = draft.description or "Не указано"
         price = f"{draft.price} ₽" if draft.price is not None else "договорная"
-        photo = draft.photo_file_id or "Не указано"
+        photo = self._format_photo_status(draft.photo_file_id)
 
         return (
             "Проверьте эскиз:\n\n"
@@ -273,7 +273,7 @@ class AdminSketchService:
             f"Название: {draft.name}\n"
             f"Описание: {description}\n"
             f"Цена: {price}\n"
-            f"Фото file_id: {photo}\n"
+            f"Фото: {photo}\n"
             f"Статус: {STATUS_LABELS.get(draft.status, draft.status)}"
         )
 
@@ -287,7 +287,7 @@ class AdminSketchService:
         style_name = sketch.style.name if sketch.style else "Не указан"
         description = sketch.description or "Не указано"
         price = f"{sketch.price} ₽" if sketch.price is not None else "договорная"
-        photo = sketch.photo_file_id or "Не указано"
+        photo = self._format_photo_status(sketch.photo_file_id)
 
         return (
             f"Эскиз #{sketch.id}\n\n"
@@ -295,7 +295,7 @@ class AdminSketchService:
             f"Название: {sketch.name}\n"
             f"Описание: {description}\n"
             f"Цена: {price}\n"
-            f"Фото file_id: {photo}\n"
+            f"Фото: {photo}\n"
             f"Статус: {STATUS_LABELS.get(sketch.status, sketch.status)}"
         )
 
@@ -304,3 +304,6 @@ class AdminSketchService:
             return "Эскиз не найден."
 
         return "Эскиз обновлён.\n\n" + self.build_sketch_card_text(sketch)
+
+    def _format_photo_status(self, photo_file_id: str | None) -> str:
+        return "задано" if photo_file_id else "не задано"
