@@ -11,10 +11,12 @@ from db.models import Style, Sketch
 from db.repositories.style_repo import get_all_styles
 from db.repositories.sketch_repo import (
     find_viewed_sketch_photo_in_style,
+    get_available_sketches,
     get_available_sketches_by_style_id,
     get_sketch_by_id_with_style,
     increment_sketch_views,
 )
+from utils.config import is_simple_bot
 
 
 class SketchCatalogService:
@@ -30,6 +32,9 @@ class SketchCatalogService:
             session=self.session,
             style_id=style_id,
         )
+
+    async def get_sketches(self) -> list[Sketch]:
+        return await get_available_sketches(session=self.session)
 
     async def get_sketch_by_id(self, sketch_id: int) -> Sketch | None:
         sketch = await get_sketch_by_id_with_style(
@@ -56,7 +61,7 @@ class SketchCatalogService:
         style_cards = await self._build_style_cards(styles)
 
         if not style_cards:
-            await message.answer("Пока нет доступных эскизов для показа в каталоге.")
+            await message.answer("Пока нет доступных услуг для показа в записи.")
             return
 
         for style_chunk in chunks(style_cards, 10):
@@ -71,7 +76,7 @@ class SketchCatalogService:
             await self._send_media(message, media)
 
         await message.answer(
-            "Выберите стиль:",
+            "Выберите категорию:",
             reply_markup=build_styles_reply_keyboard(styles),
         )
 
@@ -81,7 +86,7 @@ class SketchCatalogService:
         sketches: list[Sketch],
     ) -> None:
         if not sketches:
-            await message.answer("В этом стиле пока нет доступных эскизов.")
+            await message.answer("Пока нет доступных услуг.")
             return
 
         for sketch_chunk in chunks(sketches, 10):
@@ -96,7 +101,7 @@ class SketchCatalogService:
             await self._send_media(message, media)
 
         await message.answer(
-            "Выберите эскиз:",
+            "Выберите услугу:",
             reply_markup=build_sketches_reply_keyboard(sketches),
         )
 
@@ -153,17 +158,18 @@ class SketchCatalogService:
     def _build_short_sketch_caption(self, sketch: Sketch) -> str:
         price = f"от {sketch.price} ₽" if sketch.price else "договорная"
 
-        return f"Эскиз: {sketch.name}\n" f"Цена: {price}"
+        return f"Услуга: {sketch.name}\n" f"Цена: {price}"
 
     def _build_full_sketch_caption(self, sketch: Sketch) -> str:
         price = f"от {sketch.price} ₽" if sketch.price else "договорная"
         status = self._format_status(sketch.status)
         description = sketch.description or "Описание не указано."
         style_name = sketch.style.name if sketch.style else "Не указан"
+        category_line = "" if is_simple_bot() else f"Категория: {style_name}\n"
 
         return (
-            f"Эскиз: {sketch.name}\n"
-            f"Стиль: {style_name}\n"
+            f"Услуга: {sketch.name}\n"
+            f"{category_line}"
             f"Цена: {price}\n"
             f"Статус: {status}\n"
             f"Описание: {description}"

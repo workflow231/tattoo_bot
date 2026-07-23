@@ -1,4 +1,5 @@
 from datetime import date
+from collections import Counter
 
 from aiogram.types import (
     InlineKeyboardButton,
@@ -8,6 +9,7 @@ from aiogram.types import (
 )
 
 from db.models import Style, Sketch
+from utils.config import is_simple_bot
 
 BACK_BUTTON = "⬅️ Назад"
 MAIN_MENU_BUTTON = "🏠 Главное меню"
@@ -21,12 +23,12 @@ CATALOG_PAGE_SIZE = 10
 MY_APPOINTMENTS_BUTTON = "Мои заявки"
 CANCEL_APPOINTMENT_BUTTON = "Отменить заявку"
 ADMIN_APPOINTMENTS_BUTTON = "Заявки"
-ADMIN_SKETCHES_BUTTON = "Эскизы"
-ADD_SKETCH_BUTTON = "Добавить эскиз"
-DELETE_STYLE_BUTTON = "Удалить стиль"
-EDIT_STYLE_BUTTON = "Изменить стиль"
-DELETE_SKETCH_BUTTON = "Удалить эскиз"
-EDIT_SKETCH_BUTTON = "Изменить эскиз"
+ADMIN_SKETCHES_BUTTON = "Услуги"
+ADD_SKETCH_BUTTON = "Добавить услугу"
+DELETE_STYLE_BUTTON = "Удалить категорию"
+EDIT_STYLE_BUTTON = "Изменить категорию"
+DELETE_SKETCH_BUTTON = "Удалить услугу"
+EDIT_SKETCH_BUTTON = "Изменить услугу"
 CLIENT_CALENDAR_BUTTON = "Календарь"
 CALENDAR_BUTTON = "Календарь с записями"
 WORKING_HOURS_BUTTON = "Рабочее время"
@@ -60,14 +62,14 @@ ADMIN_REMOVE_WEEKLY_DAY_OFF_BUTTON = "Снять постоянный выход
 ADMIN_REMOVE_BLOCKED_SLOT_PREFIX = "Снять блокировку"
 SKIP_COMMENT_BUTTON = "Пропустить"
 CONFIRM_CREATE_REQUEST_BUTTON = "Создать заявку"
-CONFIRM_CREATE_SKETCH_BUTTON = "Сохранить эскиз"
-CONFIRM_DELETE_STYLE_BUTTON = "Удалить стиль точно"
-CONFIRM_DELETE_SKETCH_BUTTON = "Удалить эскиз точно"
+CONFIRM_CREATE_SKETCH_BUTTON = "Сохранить услугу"
+CONFIRM_DELETE_STYLE_BUTTON = "Удалить категорию точно"
+CONFIRM_DELETE_SKETCH_BUTTON = "Удалить услугу точно"
 CHANGE_DATE_BUTTON = "Изменить дату"
 CHANGE_TIME_BUTTON = "Изменить время"
 CHANGE_COMMENT_BUTTON = "Изменить комментарий"
 CANCEL_BUTTON = "Отмена"
-CREATE_STYLE_BUTTON = "Создать новый стиль"
+CREATE_STYLE_BUTTON = "Создать новую категорию"
 AVAILABLE_STATUS_BUTTON = "Доступен"
 RESERVED_STATUS_BUTTON = "Зарезервирован"
 HIDDEN_STATUS_BUTTON = "Скрыт"
@@ -76,7 +78,7 @@ EDIT_SKETCH_DESCRIPTION_BUTTON = "Описание"
 EDIT_SKETCH_PRICE_BUTTON = "Цена"
 EDIT_SKETCH_PHOTO_BUTTON = "Фото"
 EDIT_SKETCH_STATUS_BUTTON = "Статус"
-EDIT_SKETCH_STYLE_BUTTON = "Стиль"
+EDIT_SKETCH_STYLE_BUTTON = "Категория"
 
 ADMIN_CALENDAR_CALLBACK_PREFIX = "admcal"
 CLIENT_CALENDAR_CALLBACK_PREFIX = "clical"
@@ -147,13 +149,14 @@ def build_sketches_reply_keyboard(
     page: int = 0,
     page_size: int = CATALOG_PAGE_SIZE,
 ) -> ReplyKeyboardMarkup:
-    keyboard = []
     page_items = _get_page_items(sketches, page=page, page_size=page_size)
+    button_texts = build_sketch_button_text_by_id(
+        sketches=sketches,
+        page=page,
+        page_size=page_size,
+    )
 
-    for sketch in page_items:
-        price = f" — от {sketch.price} ₽" if sketch.price else " — цена договорная"
-
-        keyboard.append([KeyboardButton(text=f"{sketch.name}{price}")])
+    keyboard = [[KeyboardButton(text=button_texts[sketch.id])] for sketch in page_items]
 
     _append_pagination_row(
         keyboard=keyboard,
@@ -172,6 +175,38 @@ def build_sketches_reply_keyboard(
         keyboard=keyboard,
         resize_keyboard=True,
     )
+
+
+def build_sketch_button_text_by_id(
+    sketches: list[Sketch],
+    page: int = 0,
+    page_size: int = CATALOG_PAGE_SIZE,
+) -> dict[int, str]:
+    page_items = _get_page_items(sketches, page=page, page_size=page_size)
+    base_texts = [_build_sketch_button_base_text(sketch) for sketch in page_items]
+    counts = Counter(base_texts)
+
+    return {
+        sketch.id: _build_sketch_button_text(
+            sketch=sketch,
+            duplicate=counts[_build_sketch_button_base_text(sketch)] > 1,
+        )
+        for sketch in page_items
+    }
+
+
+def _build_sketch_button_text(sketch: Sketch, duplicate: bool) -> str:
+    text = _build_sketch_button_base_text(sketch)
+
+    if duplicate:
+        return f"{text} (#{sketch.id})"
+
+    return text
+
+
+def _build_sketch_button_base_text(sketch: Sketch) -> str:
+    price = f" — от {sketch.price} ₽" if sketch.price else " — цена договорная"
+    return f"{sketch.name}{price}"
 
 
 def build_appointment_date_keyboard() -> ReplyKeyboardMarkup:
@@ -651,14 +686,24 @@ def build_admin_sketch_style_keyboard(styles: list[Style]) -> ReplyKeyboardMarku
     return build_admin_sketch_style_names_keyboard([style.name for style in styles])
 
 
-def build_admin_sketch_actions_keyboard() -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text=ADD_SKETCH_BUTTON)],
+def build_admin_sketch_actions_keyboard(
+    simple_bot: bool | None = None,
+) -> ReplyKeyboardMarkup:
+    if simple_bot is None:
+        simple_bot = is_simple_bot()
+
+    keyboard = [[KeyboardButton(text=ADD_SKETCH_BUTTON)]]
+
+    if not simple_bot:
+        keyboard.append(
             [
                 KeyboardButton(text=DELETE_STYLE_BUTTON),
                 KeyboardButton(text=EDIT_STYLE_BUTTON),
-            ],
+            ]
+        )
+
+    keyboard.extend(
+        [
             [
                 KeyboardButton(text=DELETE_SKETCH_BUTTON),
                 KeyboardButton(text=EDIT_SKETCH_BUTTON),
@@ -667,7 +712,11 @@ def build_admin_sketch_actions_keyboard() -> ReplyKeyboardMarkup:
                 KeyboardButton(text=BACK_BUTTON),
                 KeyboardButton(text=MAIN_MENU_BUTTON),
             ],
-        ],
+        ]
+    )
+
+    return ReplyKeyboardMarkup(
+        keyboard=keyboard,
         resize_keyboard=True,
     )
 
@@ -726,26 +775,39 @@ def build_admin_sketch_select_keyboard(
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
 
-def build_admin_sketch_edit_fields_keyboard() -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [
-                KeyboardButton(text=EDIT_SKETCH_NAME_BUTTON),
-                KeyboardButton(text=EDIT_SKETCH_DESCRIPTION_BUTTON),
-            ],
-            [
-                KeyboardButton(text=EDIT_SKETCH_PRICE_BUTTON),
-                KeyboardButton(text=EDIT_SKETCH_PHOTO_BUTTON),
-            ],
-            [
-                KeyboardButton(text=EDIT_SKETCH_STATUS_BUTTON),
-                KeyboardButton(text=EDIT_SKETCH_STYLE_BUTTON),
-            ],
+def build_admin_sketch_edit_fields_keyboard(
+    simple_bot: bool | None = None,
+) -> ReplyKeyboardMarkup:
+    if simple_bot is None:
+        simple_bot = is_simple_bot()
+
+    keyboard = [
+        [
+            KeyboardButton(text=EDIT_SKETCH_NAME_BUTTON),
+            KeyboardButton(text=EDIT_SKETCH_DESCRIPTION_BUTTON),
+        ],
+        [
+            KeyboardButton(text=EDIT_SKETCH_PRICE_BUTTON),
+            KeyboardButton(text=EDIT_SKETCH_PHOTO_BUTTON),
+        ],
+    ]
+
+    status_row = [KeyboardButton(text=EDIT_SKETCH_STATUS_BUTTON)]
+    if not simple_bot:
+        status_row.append(KeyboardButton(text=EDIT_SKETCH_STYLE_BUTTON))
+
+    keyboard.extend(
+        [
+            status_row,
             [
                 KeyboardButton(text=BACK_BUTTON),
                 KeyboardButton(text=MAIN_MENU_BUTTON),
             ],
-        ],
+        ]
+    )
+
+    return ReplyKeyboardMarkup(
+        keyboard=keyboard,
         resize_keyboard=True,
     )
 

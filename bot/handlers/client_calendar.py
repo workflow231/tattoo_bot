@@ -103,7 +103,7 @@ async def handle_client_calendar_callback(
                 f"{appointment_date.strftime(DATE_FORMAT)}\n\n"
                 "Свободные слоты:\n"
                 + "\n".join(available_times)
-                + "\n\nЗапись создаётся через карточку эскиза.",
+                + "\n\nЗапись создаётся через карточку услуги.",
                 reply_markup=build_back_main_keyboard(),
             )
             return
@@ -182,5 +182,5 @@ def _build_client_calendar_text(title: str) -> str:
     return (
         f"Календарь мастера: {title}\n\n"
         "Можно посмотреть свободные слоты.\n"
-        "Запись создаётся только через выбранный эскиз."
+        "Запись создаётся только через выбранную услугу."
     )

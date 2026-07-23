@@ -1,5 +1,6 @@
 import pytest
 
+from db.repositories.style_repo import INTERNAL_SIMPLE_STYLE_NAME
 from services.admin_sketch_service import AdminSketchService, SketchDraft
 
 
@@ -28,11 +29,52 @@ def test_admin_sketch_service_builds_summary() -> None:
 
     text = service.build_summary_text(draft)
 
-    assert "Стиль: Графика" in text
+    assert "Категория: Графика" in text
     assert "Название: Линии" in text
     assert "Цена: договорная" in text
+    assert "Фото: не задано" in text
     assert "Статус: доступен" in text
     assert "Просмотры" not in text
+    assert "file_id" not in text
+
+
+def test_admin_sketch_service_hides_category_in_simple_mode(monkeypatch) -> None:
+    monkeypatch.setenv("SIMPLE_BOT", "true")
+    service = AdminSketchService(session=None)
+    draft = SketchDraft(
+        style_id=1,
+        style_name="Графика",
+        name="Линии",
+        description=None,
+        price=None,
+        photo_file_id="photo",
+        status="available",
+    )
+
+    text = service.build_summary_text(draft)
+
+    assert "Категория:" not in text
+    assert "услугу" in text
+    assert "Фото: задано" in text
+
+
+def test_admin_sketch_service_hides_internal_category_name(monkeypatch) -> None:
+    monkeypatch.setenv("SIMPLE_BOT", "false")
+    service = AdminSketchService(session=None)
+    draft = SketchDraft(
+        style_id=1,
+        style_name=INTERNAL_SIMPLE_STYLE_NAME,
+        name="Покрытие",
+        description=None,
+        price=None,
+        photo_file_id=None,
+        status="available",
+    )
+
+    text = service.build_summary_text(draft)
+
+    assert INTERNAL_SIMPLE_STYLE_NAME not in text
+    assert "Категория:" not in text
 
 
 @pytest.mark.anyio
@@ -68,7 +110,7 @@ async def test_delete_style_removes_linked_sketches(monkeypatch) -> None:
 
     result = await AdminSketchService(session=None).delete_style(style_id=1)
 
-    assert result == "Стиль «Графика» удалён. Удалено эскизов: 2."
+    assert result == "Категория «Графика» удалена. Удалено услуг: 2."
 
 
 @pytest.mark.anyio
@@ -99,7 +141,7 @@ async def test_delete_style_rejects_style_with_sketch_appointments(
 
     result = await AdminSketchService(session=None).delete_style(style_id=1)
 
-    assert result == "Нельзя удалить стиль, потому что по его эскизам есть заявки."
+    assert result == "Нельзя удалить категорию, потому что по её услугам есть заявки."
 
 
 @pytest.mark.anyio
@@ -121,7 +163,7 @@ async def test_delete_sketch_rejects_sketch_with_appointments(monkeypatch) -> No
 
     result = await AdminSketchService(session=None).delete_sketch(sketch_id=1)
 
-    assert result == "Нельзя удалить эскиз, потому что по нему есть заявки."
+    assert result == "Нельзя удалить услугу, потому что по ней есть заявки."
 
 
 @pytest.mark.anyio
@@ -146,4 +188,20 @@ async def test_rename_style_rejects_duplicate_name(monkeypatch) -> None:
         style_name="Минимализм",
     )
 
-    assert result == "Стиль с таким названием уже существует."
+    assert result == "Категория с таким названием уже существует."
+
+
+@pytest.mark.anyio
+async def test_simple_mode_default_style_uses_internal_name(monkeypatch) -> None:
+    calls = []
+
+    async def fake_create_style(session, style_name):
+        calls.append(style_name)
+        return type("StyleStub", (), {"id": 1, "name": style_name})()
+
+    monkeypatch.setattr("services.admin_sketch_service.create_style", fake_create_style)
+
+    style = await AdminSketchService(session=None).get_or_create_default_style()
+
+    assert style.name == INTERNAL_SIMPLE_STYLE_NAME
+    assert calls == [INTERNAL_SIMPLE_STYLE_NAME]

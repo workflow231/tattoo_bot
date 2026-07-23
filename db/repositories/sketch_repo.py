@@ -23,6 +23,21 @@ async def get_available_sketches_by_style_id(
     return list(result.scalars().all())
 
 
+async def get_available_sketches(session: AsyncSession) -> list[Sketch]:
+    stmt = (
+        select(Sketch)
+        .options(selectinload(Sketch.style))
+        .where(
+            Sketch.status == "available",
+            Sketch.photo_file_id.is_not(None),
+        )
+        .order_by(Sketch.views.desc(), Sketch.id.desc())
+    )
+
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
 async def get_all_sketches_with_style(session: AsyncSession) -> list[Sketch]:
     stmt = (
         select(Sketch)

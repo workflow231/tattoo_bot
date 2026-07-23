@@ -152,7 +152,7 @@ async def start_appointment_creation(
 
     if not data.get("sketch_id"):
         await message.answer(
-            "Сначала выберите эскиз из каталога.",
+            "Сначала выберите услугу в записи.",
             reply_markup=client_menu_kb,
         )
         return
@@ -178,7 +178,7 @@ async def choose_appointment_date(
     if message.text == BACK_BUTTON:
         await state.set_state(SketchCatalogState.sketch_selected)
         await message.answer(
-            "Вы вернулись к карточке эскиза.",
+            "Вы вернулись к карточке услуги.",
             reply_markup=sketch_card_kb,
         )
         return
@@ -395,7 +395,7 @@ async def confirm_appointment_creation(
 
     if not appointment:
         await message.answer(
-            "Не удалось создать заявку. Возможно, эскиз недоступен или слот уже занят.",
+            "Не удалось создать заявку. Возможно, услуга недоступна или слот уже занят.",
             reply_markup=client_menu_kb,
         )
         return
@@ -432,7 +432,7 @@ async def _show_appointment_summary(
     if not sketch:
         await state.clear()
         await message.answer(
-            "Эскиз не найден или уже недоступен.",
+            "Услуга не найдена или уже недоступна.",
             reply_markup=client_menu_kb,
         )
         return

@@ -19,6 +19,10 @@ def get_bool_env(name: str, default: bool = False) -> bool:
     return raw_value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def is_simple_bot() -> bool:
+    return get_bool_env("SIMPLE_BOT", default=False)
+
+
 def get_int_env(name: str, default: int) -> int:
     raw_value = os.getenv(name)
 

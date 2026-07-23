@@ -7,6 +7,7 @@ from utils.config import (
     get_bool_env,
     get_int_env,
     get_required_env,
+    is_simple_bot,
 )
 
 
@@ -33,6 +34,18 @@ def test_sql_echo_accepts_explicit_truthy_values(monkeypatch) -> None:
     monkeypatch.setenv("SQL_ECHO", "true")
 
     assert get_bool_env("SQL_ECHO", default=False) is True
+
+
+def test_simple_bot_defaults_to_false(monkeypatch) -> None:
+    monkeypatch.delenv("SIMPLE_BOT", raising=False)
+
+    assert is_simple_bot() is False
+
+
+def test_simple_bot_accepts_truthy_values(monkeypatch) -> None:
+    monkeypatch.setenv("SIMPLE_BOT", "true")
+
+    assert is_simple_bot() is True
 
 
 def test_get_int_env_rejects_non_integer(monkeypatch) -> None:

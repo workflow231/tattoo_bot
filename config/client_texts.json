@@ -5,8 +5,8 @@
   "master_contact": "Связаться с мастером:\n\n{contact}",
   "master_contact_missing": "Контакт мастера пока не указан.\n\nПопробуйте написать позже или дождитесь ответа по заявке.",
   "appointment_created": "Заявка создана и ожидает подтверждения.\n\nПосле разговора с мастером админ подтвердит или отклонит заявку.",
-  "appointment_confirmed": "Ваша заявка подтверждена.\n\nДата: {appointment_date}\nВремя: {appointment_time}\nЭскиз: {sketch_name}\n\nЗа день до записи бот пришлёт напоминание.",
+  "appointment_confirmed": "Ваша заявка подтверждена.\n\nДата: {appointment_date}\nВремя: {appointment_time}\nУслуга: {sketch_name}\n\nЗа день до записи бот пришлёт напоминание.",
   "appointment_rejected": "Ваша заявка отклонена.\n\nСвяжитесь с мастером, чтобы выбрать другую дату или уточнить детали.",
-  "reminder_tomorrow": "Напоминание о записи\n\nЗавтра у вас сеанс тату.\n\nДата: {appointment_date}\nВремя: {appointment_time}\nЭскиз: {sketch_name}\n\nЕсли планы изменились — напишите мастеру заранее.",
+  "reminder_tomorrow": "Напоминание о записи\n\nЗавтра у вас запись.\n\nДата: {appointment_date}\nВремя: {appointment_time}\nУслуга: {sketch_name}\n\nЕсли планы изменились — напишите мастеру заранее.",
   "stale_session": "Сессия устарела. Откройте нужный раздел заново."
 }

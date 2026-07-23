@@ -11,6 +11,7 @@ from bot.keyboards import (
     MAIN_MENU_BUTTON,
     NEXT_PAGE_BUTTON,
     PREVIOUS_PAGE_BUTTON,
+    build_sketch_button_text_by_id,
     build_sketches_reply_keyboard,
     build_styles_reply_keyboard,
     sketch_card_kb,
@@ -19,6 +20,7 @@ from bot.menu_utils import get_main_menu_for_message
 from services.sketch_catalog_service import SketchCatalogService
 from services.master_contact_service import MasterContactService
 from bot.states import SketchCatalogState
+from utils.config import is_simple_bot
 
 router = Router()
 
@@ -33,11 +35,38 @@ async def sketch_catalog(
 
     service = SketchCatalogService(session=session)
 
+    if is_simple_bot():
+        sketches = await service.get_sketches()
+
+        if not sketches:
+            await message.answer(
+                "К сожалению, список услуг пока пуст, но он обязательно скоро появится.",
+                reply_markup=get_main_menu_for_message(
+                    session=session, message=message
+                ),
+            )
+            return
+
+        sketch_buttons = _build_sketch_buttons(sketches=sketches, page=0)
+
+        await state.update_data(
+            simple_bot=True,
+            sketch_buttons=sketch_buttons,
+            sketch_page=0,
+        )
+        await state.set_state(SketchCatalogState.choosing_sketch)
+
+        await service.send_sketches_catalog(
+            message=message,
+            sketches=sketches,
+        )
+        return
+
     styles = await service.get_styles()
 
     if not styles:
         await message.answer(
-            "К сожалению, список стилей пока пуст, но он обязательно скоро появится.",
+            "К сожалению, список категорий пока пуст, но он обязательно скоро появится.",
             reply_markup=get_main_menu_for_message(session=session, message=message),
         )
         return
@@ -59,6 +88,10 @@ async def choose_style(
     state: FSMContext,
     session: AsyncSession,
 ):
+    if is_simple_bot():
+        await sketch_catalog(message=message, state=state, session=session)
+        return
+
     if message.text == MAIN_MENU_BUTTON:
         await state.clear()
         await message.answer(
@@ -83,7 +116,7 @@ async def choose_style(
     style_id = style_buttons.get(message.text)
 
     if not style_id:
-        await message.answer("Выберите стиль кнопкой из списка.")
+        await message.answer("Выберите категорию кнопкой из списка.")
         return
 
     service = SketchCatalogService(session=session)
@@ -91,7 +124,7 @@ async def choose_style(
     sketches = await service.get_sketches_by_style_id(style_id=style_id)
 
     if not sketches:
-        await message.answer("В этом стиле пока нет доступных эскизов.")
+        await message.answer("В этой категории пока нет доступных услуг.")
         return
 
     sketch_buttons = _build_sketch_buttons(sketches=sketches, page=0)
@@ -124,6 +157,19 @@ async def choose_sketch(
         return
 
     if message.text == BACK_BUTTON:
+        data = await state.get_data()
+
+        if data.get("simple_bot") or is_simple_bot():
+            await state.clear()
+            await message.answer(
+                "Главное меню",
+                reply_markup=get_main_menu_for_message(
+                    session=session,
+                    message=message,
+                ),
+            )
+            return
+
         await state.clear()
 
         service = SketchCatalogService(session=session)
@@ -132,7 +178,7 @@ async def choose_sketch(
 
         if not styles:
             await message.answer(
-                "К сожалению, список стилей пока пуст.",
+                "К сожалению, список категорий пока пуст.",
                 reply_markup=get_main_menu_for_message(
                     session=session,
                     message=message,
@@ -167,7 +213,7 @@ async def choose_sketch(
     sketch_id = sketch_buttons.get(message.text)
 
     if not sketch_id:
-        await message.answer("Выберите эскиз кнопкой из списка.")
+        await message.answer("Выберите услугу кнопкой из списка.")
         return
 
     service = SketchCatalogService(session=session)
@@ -175,7 +221,7 @@ async def choose_sketch(
     sketch = await service.get_sketch_by_id(sketch_id=sketch_id)
 
     if not sketch:
-        await message.answer("Эскиз не найден или уже недоступен.")
+        await message.answer("Услуга не найдена или уже недоступна.")
         return
 
     await state.update_data(sketch_id=sketch.id)
@@ -204,11 +250,12 @@ async def sketch_selected_actions(
     if message.text == BACK_BUTTON:
         data = await state.get_data()
         style_id = data.get("style_id")
+        simple_bot = bool(data.get("simple_bot")) or is_simple_bot()
 
-        if not style_id:
+        if not style_id and not simple_bot:
             await state.clear()
             await message.answer(
-                "Не удалось вернуться к списку эскизов. Откройте каталог заново.",
+                "Не удалось вернуться к списку услуг. Откройте запись заново.",
                 reply_markup=get_main_menu_for_message(
                     session=session,
                     message=message,
@@ -217,12 +264,16 @@ async def sketch_selected_actions(
             return
 
         service = SketchCatalogService(session=session)
-        sketches = await service.get_sketches_by_style_id(style_id=style_id)
+        sketches = (
+            await service.get_sketches()
+            if simple_bot
+            else await service.get_sketches_by_style_id(style_id=style_id)
+        )
 
         if not sketches:
             await state.clear()
             await message.answer(
-                "В этом стиле пока нет доступных эскизов.",
+                "Пока нет доступных услуг.",
                 reply_markup=get_main_menu_for_message(
                     session=session,
                     message=message,
@@ -254,11 +305,6 @@ async def sketch_selected_actions(
     )
 
 
-def _build_sketch_button_text(sketch) -> str:
-    price = f" — от {sketch.price} ₽" if sketch.price else " — цена договорная"
-    return f"{sketch.name}{price}"
-
-
 async def _send_styles_page(
     session: AsyncSession,
     message: Message,
@@ -266,13 +312,17 @@ async def _send_styles_page(
     current_page: int,
     step: int,
 ) -> None:
+    if is_simple_bot():
+        await sketch_catalog(message=message, state=state, session=session)
+        return
+
     service = SketchCatalogService(session=session)
     styles = await service.get_styles()
 
     if not styles:
         await state.clear()
         await message.answer(
-            "К сожалению, список стилей пока пуст.",
+            "К сожалению, список категорий пока пуст.",
             reply_markup=get_main_menu_for_message(session=session, message=message),
         )
         return
@@ -287,7 +337,11 @@ async def _send_styles_page(
     await state.update_data(style_buttons=style_buttons, style_page=page)
     await state.set_state(SketchCatalogState.choosing_style)
     await message.answer(
-        _build_page_text(title="Выберите стиль", page=page, items_count=len(styles)),
+        _build_page_text(
+            title="Выберите категорию",
+            page=page,
+            items_count=len(styles),
+        ),
         reply_markup=build_styles_reply_keyboard(styles=styles, page=page),
     )
 
@@ -301,22 +355,27 @@ async def _send_sketches_page(
 ) -> None:
     data = await state.get_data()
     style_id = data.get("style_id")
+    simple_bot = bool(data.get("simple_bot")) or is_simple_bot()
 
-    if not style_id:
+    if not style_id and not simple_bot:
         await state.clear()
         await message.answer(
-            "Не удалось открыть список эскизов. Откройте каталог заново.",
+            "Не удалось открыть список услуг. Откройте запись заново.",
             reply_markup=get_main_menu_for_message(session=session, message=message),
         )
         return
 
     service = SketchCatalogService(session=session)
-    sketches = await service.get_sketches_by_style_id(style_id=int(style_id))
+    sketches = (
+        await service.get_sketches()
+        if simple_bot
+        else await service.get_sketches_by_style_id(style_id=int(style_id))
+    )
 
     if not sketches:
         await state.clear()
         await message.answer(
-            "В этом стиле пока нет доступных эскизов.",
+            "Пока нет доступных услуг.",
             reply_markup=get_main_menu_for_message(session=session, message=message),
         )
         return
@@ -331,7 +390,7 @@ async def _send_sketches_page(
     await state.update_data(sketch_buttons=sketch_buttons, sketch_page=page)
     await state.set_state(SketchCatalogState.choosing_sketch)
     await message.answer(
-        _build_page_text(title="Выберите эскиз", page=page, items_count=len(sketches)),
+        _build_page_text(title="Выберите услугу", page=page, items_count=len(sketches)),
         reply_markup=build_sketches_reply_keyboard(sketches=sketches, page=page),
     )
 
@@ -342,8 +401,13 @@ def _build_style_buttons(styles, page: int) -> dict[str, int]:
 
 
 def _build_sketch_buttons(sketches, page: int) -> dict[str, int]:
-    page_sketches = _get_page_items(items=sketches, page=page)
-    return {_build_sketch_button_text(sketch): sketch.id for sketch in page_sketches}
+    return {
+        text: sketch_id
+        for sketch_id, text in build_sketch_button_text_by_id(
+            sketches=sketches,
+            page=page,
+        ).items()
+    }
 
 
 def _get_page_items(items, page: int):

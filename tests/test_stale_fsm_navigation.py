@@ -58,7 +58,7 @@ async def test_stale_context_button_reports_expired_session(monkeypatch) -> None
     monkeypatch.delenv("ADMIN_IDS", raising=False)
     monkeypatch.delenv("ADMIN_ID", raising=False)
     state = FakeState()
-    message = FakeMessage("Эскиз 1 — цена договорная")
+    message = FakeMessage("Услуга 1 — цена договорная")
 
     await handle_stale_reply_keyboard(message=message, state=state, session=None)
 

@@ -217,7 +217,7 @@ class AdminAppointmentService:
             f"Заявка #{appointment.id}\n\n"
             f"Клиент: {username}\n"
             f"Telegram ID: {telegram_id}\n\n"
-            f"Эскиз: {sketch_name}\n"
+            f"Услуга: {sketch_name}\n"
             f"Дата: {appointment.appointment_date.strftime(DATE_FORMAT)}\n"
             f"Время: {appointment.appointment_time.strftime(TIME_FORMAT)}\n"
             f"Статус: {self.appointment_formatter.format_status(appointment.status)}\n\n"

@@ -36,6 +36,23 @@ async def test_get_sketch_by_id_increments_views(monkeypatch) -> None:
 
 
 @pytest.mark.anyio
+async def test_get_sketches_returns_all_available_services(monkeypatch) -> None:
+    sketches = [object()]
+
+    async def fake_get_available_sketches(session):
+        return sketches
+
+    monkeypatch.setattr(
+        "services.sketch_catalog_service.get_available_sketches",
+        fake_get_available_sketches,
+    )
+
+    result = await SketchCatalogService(session=None).get_sketches()
+
+    assert result is sketches
+
+
+@pytest.mark.anyio
 async def test_get_sketch_by_id_does_not_increment_missing_sketch(monkeypatch) -> None:
     calls = []
 

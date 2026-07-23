@@ -15,6 +15,7 @@ from db.repositories.sketch_repo import (
     update_sketch,
 )
 from db.repositories.style_repo import (
+    INTERNAL_SIMPLE_STYLE_NAME,
     count_appointments_by_style_id,
     count_sketches_by_style_id,
     create_style,
@@ -24,6 +25,7 @@ from db.repositories.style_repo import (
     get_style_by_name,
     update_style_name,
 )
+from utils.config import is_simple_bot
 
 STATUS_LABELS = {
     "available": "доступен",
@@ -36,6 +38,8 @@ STATUS_VALUES = {
     "Зарезервирован": "reserved",
     "Скрыт": "hidden",
 }
+
+SIMPLE_BOT_DEFAULT_STYLE_NAME = INTERNAL_SIMPLE_STYLE_NAME
 
 
 @dataclass(frozen=True)
@@ -71,16 +75,22 @@ class AdminSketchService:
             style_name=style_name.strip(),
         )
 
+    async def get_or_create_default_style(self) -> Style:
+        return await create_style(
+            session=self.session,
+            style_name=SIMPLE_BOT_DEFAULT_STYLE_NAME,
+        )
+
     async def rename_style(self, style_id: int, style_name: str) -> str:
         style_name = style_name.strip()
 
         if not style_name:
-            return "Название стиля не может быть пустым."
+            return "Название категории не может быть пустым."
 
         style = await get_style_by_id(session=self.session, style_id=style_id)
 
         if not style:
-            return "Стиль не найден."
+            return "Категория не найдена."
 
         existing_style = await get_style_by_name(
             session=self.session,
@@ -88,7 +98,7 @@ class AdminSketchService:
         )
 
         if existing_style and existing_style.id != style.id:
-            return "Стиль с таким названием уже существует."
+            return "Категория с таким названием уже существует."
 
         updated_style = await update_style_name(
             session=self.session,
@@ -97,15 +107,15 @@ class AdminSketchService:
         )
 
         if not updated_style:
-            return "Стиль не найден."
+            return "Категория не найдена."
 
-        return f"Стиль переименован: {updated_style.name}."
+        return f"Категория переименована: {updated_style.name}."
 
     async def delete_style(self, style_id: int) -> str:
         style = await get_style_by_id(session=self.session, style_id=style_id)
 
         if not style:
-            return "Стиль не найден."
+            return "Категория не найдена."
 
         sketches_count = await count_sketches_by_style_id(
             session=self.session,
@@ -117,7 +127,7 @@ class AdminSketchService:
         )
 
         if appointments_count:
-            return "Нельзя удалить стиль, потому что по его эскизам есть заявки."
+            return "Нельзя удалить категорию, потому что по её услугам есть заявки."
 
         try:
             deleted_sketches_count, deleted = await delete_style_with_sketches(
@@ -126,18 +136,18 @@ class AdminSketchService:
             )
         except IntegrityError:
             await self.session.rollback()
-            return "Нельзя удалить стиль, потому что по его эскизам есть заявки."
+            return "Нельзя удалить категорию, потому что по её услугам есть заявки."
 
         if not deleted:
-            return "Стиль не найден."
+            return "Категория не найдена."
 
         if sketches_count:
             return (
-                f"Стиль «{style.name}» удалён. "
-                f"Удалено эскизов: {deleted_sketches_count}."
+                f"Категория «{style.name}» удалена. "
+                f"Удалено услуг: {deleted_sketches_count}."
             )
 
-        return f"Стиль «{style.name}» удалён."
+        return f"Категория «{style.name}» удалена."
 
     async def create_sketch(self, draft: SketchDraft) -> Sketch:
         return await create_sketch(
@@ -157,7 +167,7 @@ class AdminSketchService:
         )
 
         if not sketch:
-            return "Эскиз не найден."
+            return "Услуга не найдена."
 
         appointments_count = await count_appointments_by_sketch_id(
             session=self.session,
@@ -165,20 +175,20 @@ class AdminSketchService:
         )
 
         if appointments_count:
-            return "Нельзя удалить эскиз, потому что по нему есть заявки."
+            return "Нельзя удалить услугу, потому что по ней есть заявки."
 
         deleted = await delete_sketch(session=self.session, sketch_id=sketch.id)
 
         if not deleted:
-            return "Эскиз не найден."
+            return "Услуга не найдена."
 
-        return f"Эскиз «{sketch.name}» удалён."
+        return f"Услуга «{sketch.name}» удалена."
 
     async def update_sketch_name(self, sketch_id: int, name: str) -> str:
         name = name.strip()
 
         if not name:
-            return "Название эскиза не может быть пустым."
+            return "Название услуги не может быть пустым."
 
         sketch = await update_sketch(
             session=self.session,
@@ -231,7 +241,7 @@ class AdminSketchService:
         style = await get_style_by_id(session=self.session, style_id=style_id)
 
         if not style:
-            return "Стиль не найден."
+            return "Категория не найдена."
 
         sketch = await update_sketch(
             session=self.session,
@@ -265,42 +275,53 @@ class AdminSketchService:
     def build_summary_text(self, draft: SketchDraft) -> str:
         description = draft.description or "Не указано"
         price = f"{draft.price} ₽" if draft.price is not None else "договорная"
-        photo = draft.photo_file_id or "Не указано"
+        photo = "задано" if draft.photo_file_id else "не задано"
+
+        category_line = _build_category_line(draft.style_name)
 
         return (
-            "Проверьте эскиз:\n\n"
-            f"Стиль: {draft.style_name}\n"
+            "Проверьте услугу:\n\n"
+            f"{category_line}"
             f"Название: {draft.name}\n"
             f"Описание: {description}\n"
             f"Цена: {price}\n"
-            f"Фото file_id: {photo}\n"
+            f"Фото: {photo}\n"
             f"Статус: {STATUS_LABELS.get(draft.status, draft.status)}"
         )
 
     def build_style_delete_confirmation_text(self, style_name: str) -> str:
-        return f"Удалить стиль «{style_name}» и все его эскизы?"
+        return f"Удалить категорию «{style_name}» и все её услуги?"
 
     def build_sketch_delete_confirmation_text(self, sketch: Sketch) -> str:
-        return f"Удалить эскиз «{sketch.name}»?"
+        return f"Удалить услугу «{sketch.name}»?"
 
     def build_sketch_card_text(self, sketch: Sketch) -> str:
         style_name = sketch.style.name if sketch.style else "Не указан"
         description = sketch.description or "Не указано"
         price = f"{sketch.price} ₽" if sketch.price is not None else "договорная"
-        photo = sketch.photo_file_id or "Не указано"
+        photo = "задано" if sketch.photo_file_id else "не задано"
+
+        category_line = _build_category_line(style_name)
 
         return (
-            f"Эскиз #{sketch.id}\n\n"
-            f"Стиль: {style_name}\n"
+            f"Услуга #{sketch.id}\n\n"
+            f"{category_line}"
             f"Название: {sketch.name}\n"
             f"Описание: {description}\n"
             f"Цена: {price}\n"
-            f"Фото file_id: {photo}\n"
+            f"Фото: {photo}\n"
             f"Статус: {STATUS_LABELS.get(sketch.status, sketch.status)}"
         )
 
     def _build_sketch_update_result(self, sketch: Sketch | None) -> str:
         if not sketch:
-            return "Эскиз не найден."
+            return "Услуга не найдена."
 
-        return "Эскиз обновлён.\n\n" + self.build_sketch_card_text(sketch)
+        return "Услуга обновлена.\n\n" + self.build_sketch_card_text(sketch)
+
+
+def _build_category_line(style_name: str) -> str:
+    if is_simple_bot() or style_name == INTERNAL_SIMPLE_STYLE_NAME:
+        return ""
+
+    return f"Категория: {style_name}\n"

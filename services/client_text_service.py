@@ -25,7 +25,7 @@ DEFAULT_TEXTS = {
         "Ваша заявка подтверждена.\n\n"
         "Дата: {appointment_date}\n"
         "Время: {appointment_time}\n"
-        "Эскиз: {sketch_name}\n\n"
+        "Услуга: {sketch_name}\n\n"
         "За день до записи бот пришлёт напоминание."
     ),
     "appointment_rejected": (
@@ -34,10 +34,10 @@ DEFAULT_TEXTS = {
     ),
     "reminder_tomorrow": (
         "Напоминание о записи\n\n"
-        "Завтра у вас сеанс тату.\n\n"
+        "Завтра у вас запись.\n\n"
         "Дата: {appointment_date}\n"
         "Время: {appointment_time}\n"
-        "Эскиз: {sketch_name}\n\n"
+        "Услуга: {sketch_name}\n\n"
         "Если планы изменились — напишите мастеру заранее."
     ),
     "stale_session": "Сессия устарела. Откройте нужный раздел заново.",

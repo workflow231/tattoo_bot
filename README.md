@@ -1,6 +1,8 @@
 # Tattoo Bot
 
-Aiogram Telegram bot for tattoo sketch requests.
+Aiogram Telegram bot for appointment requests. This branch uses neutral
+client/admin wording: categories and services are shown in the UI, while the
+internal database models remain `Style` and `Sketch`.
 
 ## Runtime
 
@@ -11,13 +13,25 @@ Aiogram Telegram bot for tattoo sketch requests.
 - Client main menu and master main menu are separate.
 - Master/admin access is controlled by `ADMIN_IDS`.
 - Master contact text is read from `MASTER_CONTACT`.
+- Service UI mode is controlled by `SIMPLE_BOT`.
 
 ## Main Flows
 
-- Clients start booking from the `Запись` button, browse sketches, view the master calendar, create requests from a sketch card, see their requests, and contact the master.
-- The client calendar is view-only: booking still starts from a selected sketch.
-- The master can view appointments, manage the appointment calendar, and add new sketches.
-- When adding a sketch, the master chooses or creates a style, fills sketch fields, reviews the summary, and saves it.
+- Clients start from the `Запись` button.
+- With `SIMPLE_BOT=false`, clients choose a category, then choose a service,
+  open the service card, and create a request.
+- With `SIMPLE_BOT=true`, clients choose a service directly. Categories are not
+  shown to clients or admins.
+- The client calendar is view-only: booking still starts from a selected
+  service.
+- The master can view appointments, manage the appointment calendar, and manage
+  services.
+- In full mode the master can manage categories and services. In simple mode the
+  master manages only services; an internal category is used by the bot.
+- The booking flow does not add a separate "contact master" step. The existing
+  master contact button remains a separate support action.
+- This UI mode does not change the database schema and does not require a
+  migration.
 
 ## Docker Compose
 
@@ -28,6 +42,7 @@ BOT_TOKEN="your-telegram-bot-token"
 BOT_MODE="webhook"
 ADMIN_IDS="123456789"
 MASTER_CONTACT="@master_username"
+SIMPLE_BOT="false"
 WEBHOOK_URL="https://your-tailnet-host.your-tailnet.ts.net"
 WEBHOOK_PATH="/webhook"
 WEBHOOK_SECRET_TOKEN="replace-with-random-webhook-secret"
@@ -66,6 +81,20 @@ Docker Desktop, or compose logs.
 SQLite data is stored in the `tattoo_bot_data` Docker volume at
 `/app/data/tattoo_bot.db`. Redis data is stored in the `redis_data` volume.
 Tailscale state is stored in the `tailscale_state` volume.
+
+## Service UI Mode
+
+`SIMPLE_BOT` switches how categories are shown in the bot UI:
+
+- `SIMPLE_BOT=false`: full mode. The client flow is
+  `Запись -> Категории -> Услуги -> карточка услуги -> заявка`. Admins can add,
+  edit, and delete categories and services.
+- `SIMPLE_BOT=true`: simple mode. The client flow is
+  `Запись -> Услуги -> карточка услуги -> заявка`. Categories are hidden from
+  clients and admins; admins add services directly.
+
+This setting only affects UI and flow. It does not rename database tables, does
+not rename internal `Style`/`Sketch` models, and does not require a migration.
 
 ## Client Texts
 

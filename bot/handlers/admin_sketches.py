@@ -43,6 +43,7 @@ from bot.keyboards import (
 from bot.states import AdminSketchState
 from services.admin_appointment_service import AdminAppointmentService
 from services.admin_sketch_service import AdminSketchService, SketchDraft
+from utils.config import is_simple_bot
 
 router = Router()
 
@@ -97,11 +98,18 @@ async def choose_admin_sketch_action(
         await message.answer("Недостаточно прав.")
         return
 
+    simple_bot = is_simple_bot()
+
     if message.text == ADD_SKETCH_BUTTON:
-        await _send_style_choice(session=session, message=message, state=state)
+        await _start_add_sketch_flow(
+            session=session,
+            message=message,
+            state=state,
+            simple_bot=simple_bot,
+        )
         return
 
-    if message.text == DELETE_STYLE_BUTTON:
+    if message.text == DELETE_STYLE_BUTTON and not simple_bot:
         await _send_style_management_selection(
             session=session,
             message=message,
@@ -111,7 +119,7 @@ async def choose_admin_sketch_action(
         )
         return
 
-    if message.text == EDIT_STYLE_BUTTON:
+    if message.text == EDIT_STYLE_BUTTON and not simple_bot:
         await _send_style_management_selection(
             session=session,
             message=message,
@@ -176,6 +184,10 @@ async def confirm_style_delete(
         await message.answer("Недостаточно прав.")
         return
 
+    if is_simple_bot():
+        await _send_sketch_actions_menu(message=message, state=state)
+        return
+
     if message.text != CONFIRM_DELETE_STYLE_BUTTON:
         await message.answer(
             "Подтвердите удаление кнопкой или вернитесь назад.",
@@ -225,6 +237,10 @@ async def collect_new_style_name(
     if not _message_from_admin(session=session, message=message):
         await state.clear()
         await message.answer("Недостаточно прав.")
+        return
+
+    if is_simple_bot():
+        await _send_sketch_actions_menu(message=message, state=state)
         return
 
     data = await state.get_data()
@@ -323,7 +339,7 @@ async def choose_sketch_field_to_edit(
 
     field = EDIT_FIELD_BY_BUTTON.get(message.text or "")
 
-    if not field:
+    if not field or (field == "style" and is_simple_bot()):
         await message.answer(
             "Выберите поле кнопкой.",
             reply_markup=build_admin_sketch_edit_fields_keyboard(),
@@ -550,6 +566,10 @@ async def choose_edit_sketch_style(
         await message.answer("Недостаточно прав.")
         return
 
+    if is_simple_bot():
+        await _send_sketch_actions_menu(message=message, state=state)
+        return
+
     data = await state.get_data()
 
     if message.text in {PREVIOUS_PAGE_BUTTON, NEXT_PAGE_BUTTON}:
@@ -571,7 +591,7 @@ async def choose_edit_sketch_style(
     style_id = style_buttons.get(message.text or "")
 
     if not style_id:
-        await message.answer("Выберите стиль кнопкой из списка.")
+        await message.answer("Выберите категорию кнопкой из списка.")
         return
 
     sketch_id = await _get_selected_sketch_id(state=state)
@@ -602,6 +622,10 @@ async def _handle_style_management_selection(
         await message.answer("Недостаточно прав.")
         return
 
+    if is_simple_bot():
+        await _send_sketch_actions_menu(message=message, state=state)
+        return
+
     data = await state.get_data()
 
     if message.text in {PREVIOUS_PAGE_BUTTON, NEXT_PAGE_BUTTON}:
@@ -623,7 +647,7 @@ async def _handle_style_management_selection(
     style_id = style_buttons.get(message.text or "")
 
     if not style_id:
-        await message.answer("Выберите стиль кнопкой из списка.")
+        await message.answer("Выберите категорию кнопкой из списка.")
         return
 
     await state.update_data(
@@ -645,7 +669,7 @@ async def _handle_style_management_selection(
 
     await state.set_state(AdminSketchState.waiting_style_name)
     await message.answer(
-        "Введите новое название стиля:",
+        "Введите новое название категории:",
         reply_markup=build_back_main_keyboard(),
     )
 
@@ -686,14 +710,14 @@ async def _handle_sketch_management_selection(
     sketch_id = sketch_buttons.get(message.text or "")
 
     if not sketch_id:
-        await message.answer("Выберите эскиз кнопкой из списка.")
+        await message.answer("Выберите услугу кнопкой из списка.")
         return
 
     service = AdminSketchService(session=session)
     sketch = await service.get_sketch(sketch_id=sketch_id)
 
     if not sketch:
-        await message.answer("Эскиз не найден.")
+        await message.answer("Услуга не найдена.")
         return
 
     await state.update_data(selected_admin_sketch_id=sketch.id)
@@ -727,6 +751,34 @@ async def start_add_sketch(
         await message.answer("Недостаточно прав.")
         return
 
+    await _start_add_sketch_flow(
+        session=session,
+        message=message,
+        state=state,
+        simple_bot=is_simple_bot(),
+    )
+
+
+async def _start_add_sketch_flow(
+    session: AsyncSession,
+    message: Message,
+    state: FSMContext,
+    simple_bot: bool,
+) -> None:
+    if simple_bot:
+        service = AdminSketchService(session=session)
+        style = await service.get_or_create_default_style()
+        await state.update_data(
+            admin_sketch_style_id=style.id,
+            admin_sketch_style_name=style.name,
+        )
+        await state.set_state(AdminSketchState.waiting_name)
+        await message.answer(
+            "Введите название услуги:",
+            reply_markup=build_back_main_keyboard(),
+        )
+        return
+
     await _send_style_choice(session=session, message=message, state=state)
 
 
@@ -744,10 +796,19 @@ async def choose_sketch_style(
         await message.answer("Недостаточно прав.")
         return
 
+    if is_simple_bot():
+        await _start_add_sketch_flow(
+            session=session,
+            message=message,
+            state=state,
+            simple_bot=True,
+        )
+        return
+
     if message.text == CREATE_STYLE_BUTTON:
         await state.set_state(AdminSketchState.waiting_new_style_name)
         await message.answer(
-            "Введите название нового стиля:",
+            "Введите название новой категории:",
             reply_markup=build_back_main_keyboard(),
         )
         return
@@ -757,7 +818,7 @@ async def choose_sketch_style(
     style_id = style_buttons.get(message.text or "")
 
     if not style_id:
-        await message.answer("Выберите стиль кнопкой из списка.")
+        await message.answer("Выберите категорию кнопкой из списка.")
         return
 
     await state.update_data(
@@ -766,7 +827,7 @@ async def choose_sketch_style(
     )
     await state.set_state(AdminSketchState.waiting_name)
     await message.answer(
-        "Введите название эскиза:",
+        "Введите название услуги:",
         reply_markup=build_back_main_keyboard(),
     )
 
@@ -785,10 +846,14 @@ async def create_new_style(
         await message.answer("Недостаточно прав.")
         return
 
+    if is_simple_bot():
+        await _send_sketch_actions_menu(message=message, state=state)
+        return
+
     style_name = (message.text or "").strip()
 
     if not style_name or style_name == SKIP_COMMENT_BUTTON:
-        await message.answer("Введите название нового стиля текстом.")
+        await message.answer("Введите название новой категории текстом.")
         return
 
     service = AdminSketchService(session=session)
@@ -804,7 +869,7 @@ async def create_new_style(
     )
     await state.set_state(AdminSketchState.waiting_name)
     await message.answer(
-        "Стиль выбран. Введите название эскиза:",
+        "Категория выбрана. Введите название услуги:",
         reply_markup=build_back_main_keyboard(),
     )
 
@@ -826,13 +891,13 @@ async def collect_sketch_name(
     name = (message.text or "").strip()
 
     if not name or name == SKIP_COMMENT_BUTTON:
-        await message.answer("Название обязательно. Введите название эскиза.")
+        await message.answer("Название обязательно. Введите название услуги.")
         return
 
     await state.update_data(admin_sketch_name=name)
     await state.set_state(AdminSketchState.waiting_description)
     await message.answer(
-        "Введите описание эскиза или нажмите «Пропустить»:",
+        "Введите описание услуги или нажмите «Пропустить»:",
         reply_markup=build_skip_back_main_keyboard(),
     )
 
@@ -886,7 +951,7 @@ async def collect_sketch_price(
     await state.update_data(admin_sketch_price=price)
     await state.set_state(AdminSketchState.waiting_photo)
     await message.answer(
-        "Отправьте фото эскиза или file_id текстом. Можно нажать «Пропустить».",
+        "Отправьте фото услуги или file_id текстом. Можно нажать «Пропустить».",
         reply_markup=build_skip_back_main_keyboard(),
     )
 
@@ -916,7 +981,7 @@ async def collect_sketch_photo(
     await state.update_data(admin_sketch_photo_file_id=photo_file_id)
     await state.set_state(AdminSketchState.waiting_status)
     await message.answer(
-        "Выберите статус эскиза:",
+        "Выберите статус услуги:",
         reply_markup=build_admin_sketch_status_keyboard(),
     )
 
@@ -951,7 +1016,7 @@ async def collect_sketch_status(
     if status == "available" and not data.get("admin_sketch_photo_file_id"):
         await state.set_state(AdminSketchState.waiting_photo)
         await message.answer(
-            "Для доступного эскиза нужно фото. Отправьте фото или file_id.",
+            "Для доступной услуги нужно фото. Отправьте фото или file_id.",
             reply_markup=build_back_main_keyboard(),
         )
         return
@@ -961,14 +1026,14 @@ async def collect_sketch_status(
     if not draft:
         await state.clear()
         await message.answer(
-            "Не хватает данных для эскиза.", reply_markup=master_menu_kb
+            "Не хватает данных для услуги.", reply_markup=master_menu_kb
         )
         return
 
     await state.set_state(AdminSketchState.confirming)
     await message.answer(
         service.build_summary_text(draft)
-        + "\n\nНажмите «Сохранить эскиз» для сохранения.",
+        + "\n\nНажмите «Сохранить услугу» для сохранения.",
         reply_markup=build_admin_sketch_confirm_keyboard(),
     )
 
@@ -989,7 +1054,7 @@ async def confirm_sketch_creation(
 
     if message.text != CONFIRM_CREATE_SKETCH_BUTTON:
         await message.answer(
-            "Подтвердите сохранение кнопкой «Сохранить эскиз» или вернитесь назад.",
+            "Подтвердите сохранение кнопкой «Сохранить услугу» или вернитесь назад.",
             reply_markup=build_admin_sketch_confirm_keyboard(),
         )
         return
@@ -999,7 +1064,7 @@ async def confirm_sketch_creation(
     if not draft:
         await state.clear()
         await message.answer(
-            "Не хватает данных для эскиза.", reply_markup=master_menu_kb
+            "Не хватает данных для услуги.", reply_markup=master_menu_kb
         )
         return
 
@@ -1007,7 +1072,7 @@ async def confirm_sketch_creation(
     sketch = await service.create_sketch(draft=draft)
     await state.clear()
     await message.answer(
-        f"Эскиз #{sketch.id} добавлен.",
+        f"Услуга #{sketch.id} добавлена.",
         reply_markup=master_menu_kb,
     )
 
@@ -1024,7 +1089,7 @@ async def _send_style_choice(
     await state.update_data(admin_sketch_style_buttons=style_buttons)
     await state.set_state(AdminSketchState.choosing_style)
     await message.answer(
-        "Выберите стиль для эскиза:",
+        "Выберите категорию для услуги:",
         reply_markup=build_admin_sketch_style_keyboard(styles),
     )
 
@@ -1044,7 +1109,7 @@ async def _send_style_management_selection(
         await _send_sketch_actions_menu(
             message=message,
             state=state,
-            prefix="Стили пока не добавлены.",
+            prefix="Категории пока не добавлены.",
         )
         return
 
@@ -1056,7 +1121,7 @@ async def _send_style_management_selection(
     await state.set_state(target_state)
     await message.answer(
         _build_selection_text(
-            title="Выберите стиль",
+            title="Выберите категорию",
             page=page,
             items_count=len(styles),
         ),
@@ -1079,7 +1144,7 @@ async def _send_sketch_management_selection(
         await _send_sketch_actions_menu(
             message=message,
             state=state,
-            prefix="Эскизы пока не добавлены.",
+            prefix="Услуги пока не добавлены.",
         )
         return
 
@@ -1093,7 +1158,7 @@ async def _send_sketch_management_selection(
     await state.set_state(target_state)
     await message.answer(
         _build_selection_text(
-            title="Выберите эскиз",
+            title="Выберите услугу",
             page=page,
             items_count=len(sketches),
         ),
@@ -1124,7 +1189,7 @@ async def _send_sketch_actions_menu(
     prefix: str | None = None,
 ) -> None:
     await state.set_state(AdminSketchState.choosing_action)
-    text = "Выберите действие с эскизами:"
+    text = "Выберите действие с услугами:"
 
     if prefix:
         text = f"{prefix}\n\n{text}"
@@ -1197,9 +1262,13 @@ async def _handle_back_navigation(message: Message, state: FSMContext) -> None:
         return
 
     if current_state == AdminSketchState.waiting_new_style_name.state:
+        if is_simple_bot():
+            await _send_sketch_actions_menu(message=message, state=state)
+            return
+
         await state.set_state(AdminSketchState.choosing_style)
         await message.answer(
-            "Выберите стиль для эскиза:",
+            "Выберите категорию для услуги:",
             reply_markup=build_admin_sketch_style_names_keyboard(
                 await _get_style_names_from_state(state=state)
             ),
@@ -1207,9 +1276,13 @@ async def _handle_back_navigation(message: Message, state: FSMContext) -> None:
         return
 
     if current_state == AdminSketchState.waiting_name.state:
+        if is_simple_bot():
+            await _send_sketch_actions_menu(message=message, state=state)
+            return
+
         await state.set_state(AdminSketchState.choosing_style)
         await message.answer(
-            "Выберите стиль для эскиза:",
+            "Выберите категорию для услуги:",
             reply_markup=build_admin_sketch_style_names_keyboard(
                 await _get_style_names_from_state(state=state)
             ),
@@ -1219,7 +1292,7 @@ async def _handle_back_navigation(message: Message, state: FSMContext) -> None:
     if current_state == AdminSketchState.waiting_description.state:
         await state.set_state(AdminSketchState.waiting_name)
         await message.answer(
-            "Введите название эскиза:",
+            "Введите название услуги:",
             reply_markup=build_back_main_keyboard(),
         )
         return
@@ -1227,7 +1300,7 @@ async def _handle_back_navigation(message: Message, state: FSMContext) -> None:
     if current_state == AdminSketchState.waiting_price.state:
         await state.set_state(AdminSketchState.waiting_description)
         await message.answer(
-            "Введите описание эскиза или нажмите «Пропустить»:",
+            "Введите описание услуги или нажмите «Пропустить»:",
             reply_markup=build_skip_back_main_keyboard(),
         )
         return
@@ -1243,7 +1316,7 @@ async def _handle_back_navigation(message: Message, state: FSMContext) -> None:
     if current_state == AdminSketchState.waiting_status.state:
         await state.set_state(AdminSketchState.waiting_photo)
         await message.answer(
-            "Отправьте фото эскиза или file_id текстом. Можно нажать «Пропустить».",
+            "Отправьте фото услуги или file_id текстом. Можно нажать «Пропустить».",
             reply_markup=build_skip_back_main_keyboard(),
         )
         return
@@ -1251,7 +1324,7 @@ async def _handle_back_navigation(message: Message, state: FSMContext) -> None:
     if current_state == AdminSketchState.confirming.state:
         await state.set_state(AdminSketchState.waiting_status)
         await message.answer(
-            "Выберите статус эскиза:",
+            "Выберите статус услуги:",
             reply_markup=build_admin_sketch_status_keyboard(),
         )
         return
