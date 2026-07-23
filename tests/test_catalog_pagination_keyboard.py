@@ -110,6 +110,7 @@ def test_main_menus_show_booking_entry() -> None:
     assert CATALOG_BUTTON in _keyboard_texts(client_menu_kb)
     assert CATALOG_BUTTON in _keyboard_texts(master_menu_kb)
     assert MY_SOCIALS_BUTTON in _keyboard_texts(client_menu_kb)
+    assert "Мои соцсети" not in _keyboard_texts(client_menu_kb)
     assert "Каталог эскизов" not in _keyboard_texts(client_menu_kb)
     assert "Каталог эскизов" not in _keyboard_texts(master_menu_kb)
 
