@@ -48,8 +48,8 @@ async def test_available_times_exclude_pending_and_confirmed_slots(monkeypatch) 
 
 @pytest.mark.anyio
 async def test_create_pending_appointment_handles_busy_slot_race(monkeypatch) -> None:
-    async def fake_get_user_by_telegram_id(self, telegram_id):
-        return _user()
+    async def fake_get_or_create_user(session, telegram_id, username):
+        return _user(), False
 
     async def fake_get_sketch(self, sketch_id):
         return _sketch()
@@ -61,9 +61,8 @@ async def test_create_pending_appointment_handles_busy_slot_race(monkeypatch) ->
         raise IntegrityError("statement", {}, Exception("unique"))
 
     monkeypatch.setattr(
-        AppointmentService,
-        "get_user_by_telegram_id",
-        fake_get_user_by_telegram_id,
+        "services.appointment_service.get_or_create_user",
+        fake_get_or_create_user,
     )
     monkeypatch.setattr(AppointmentService, "get_sketch", fake_get_sketch)
     monkeypatch.setattr(
@@ -93,8 +92,8 @@ async def test_create_pending_appointment_handles_busy_slot_race(monkeypatch) ->
 async def test_create_pending_no_sketch_appointment_does_not_require_sketch(
     monkeypatch,
 ) -> None:
-    async def fake_get_user_by_telegram_id(self, telegram_id):
-        return _user()
+    async def fake_get_or_create_user(session, telegram_id, username):
+        return _user(), False
 
     async def fake_get_sketch(self, sketch_id):
         raise AssertionError("no_sketch should not load a sketch")
@@ -106,9 +105,8 @@ async def test_create_pending_no_sketch_appointment_does_not_require_sketch(
         return kwargs
 
     monkeypatch.setattr(
-        AppointmentService,
-        "get_user_by_telegram_id",
-        fake_get_user_by_telegram_id,
+        "services.appointment_service.get_or_create_user",
+        fake_get_or_create_user,
     )
     monkeypatch.setattr(AppointmentService, "get_sketch", fake_get_sketch)
     monkeypatch.setattr(
@@ -138,13 +136,12 @@ async def test_create_pending_no_sketch_appointment_does_not_require_sketch(
 
 @pytest.mark.anyio
 async def test_create_pending_custom_sketch_requires_photo(monkeypatch) -> None:
-    async def fake_get_user_by_telegram_id(self, telegram_id):
-        return _user()
+    async def fake_get_or_create_user(session, telegram_id, username):
+        return _user(), False
 
     monkeypatch.setattr(
-        AppointmentService,
-        "get_user_by_telegram_id",
-        fake_get_user_by_telegram_id,
+        "services.appointment_service.get_or_create_user",
+        fake_get_or_create_user,
     )
 
     result = await AppointmentService(session=None).create_pending_appointment(
@@ -159,6 +156,53 @@ async def test_create_pending_custom_sketch_requires_photo(monkeypatch) -> None:
     )
 
     assert result is None
+
+
+@pytest.mark.anyio
+async def test_create_pending_appointment_gets_or_creates_missing_user(
+    monkeypatch,
+) -> None:
+    calls = []
+
+    async def fake_get_or_create_user(session, telegram_id, username):
+        calls.append((session, telegram_id, username))
+        return _user(), True
+
+    async def fake_is_time_available(self, appointment_date, appointment_time):
+        return True
+
+    async def fake_create_appointment(**kwargs):
+        return kwargs
+
+    monkeypatch.setattr(
+        "services.appointment_service.get_or_create_user",
+        fake_get_or_create_user,
+    )
+    monkeypatch.setattr(
+        AppointmentService,
+        "is_time_available",
+        fake_is_time_available,
+    )
+    monkeypatch.setattr(
+        "services.appointment_service.create_appointment",
+        fake_create_appointment,
+    )
+
+    result = await AppointmentService(session="session").create_pending_appointment(
+        telegram_id=123,
+        username="client",
+        draft=AppointmentDraft(
+            sketch_id=None,
+            appointment_date=date(2026, 7, 13),
+            appointment_time=time(12, 0),
+            comment=None,
+            request_type="no_sketch",
+        ),
+    )
+
+    assert calls == [("session", 123, "client")]
+    assert result["user_id"] == 1
+    assert result["request_type"] == "no_sketch"
 
 
 def test_appointment_sketch_name_formats_request_types() -> None:

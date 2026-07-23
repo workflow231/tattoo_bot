@@ -20,7 +20,7 @@ from db.repositories.schedule_repo import (
     list_blocked_slots_for_day,
 )
 from db.repositories.sketch_repo import get_sketch_by_id_with_style
-from db.repositories.user_repo import get_user_by_telegram_id
+from db.repositories.user_repo import get_or_create_user, get_user_by_telegram_id
 from services.client_text_service import ClientTextService
 from services.working_hours_service import WorkingHoursService
 from utils.admin_calendar import MONTH_NAMES, iter_month_weeks, shift_month
@@ -85,8 +85,13 @@ class AppointmentService:
         self,
         telegram_id: int,
         draft: AppointmentDraft,
+        username: str | None = None,
     ) -> Appointment | None:
-        user = await self.get_user_by_telegram_id(telegram_id=telegram_id)
+        user, _ = await get_or_create_user(
+            session=self.session,
+            telegram_id=telegram_id,
+            username=username,
+        )
 
         if not user or not self.is_valid_request_type(draft.request_type):
             return None

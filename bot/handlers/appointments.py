@@ -554,6 +554,7 @@ async def confirm_appointment_creation(
     appointment = await service.create_pending_appointment(
         telegram_id=message.from_user.id,
         draft=draft,
+        username=getattr(message.from_user, "username", None),
     )
 
     if not appointment:

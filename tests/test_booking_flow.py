@@ -4,6 +4,7 @@ from bot.handlers import appointments
 from bot.keyboards import (
     BACK_BUTTON,
     CHOOSE_SKETCH_BUTTON,
+    CONFIRM_CREATE_REQUEST_BUTTON,
     MAIN_MENU_BUTTON,
     NO_SKETCH_REQUEST_BUTTON,
     build_booking_menu_keyboard,
@@ -16,6 +17,7 @@ from bot.states import AppointmentState, BookingState
 class FakeUser:
     def __init__(self, user_id: int = 123):
         self.id = user_id
+        self.username = "client"
 
 
 class FakePhoto:
@@ -195,3 +197,60 @@ async def test_show_booking_menu_enters_booking_state() -> None:
     assert message.answers == [
         ("Выберите вариант записи:", build_booking_menu_keyboard())
     ]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("request_type", "sketch_id", "photo_file_id"),
+    [
+        ("catalog_sketch", 7, None),
+        ("custom_sketch", None, "photo"),
+        ("no_sketch", None, None),
+    ],
+)
+async def test_confirm_appointment_creation_creates_all_request_types(
+    monkeypatch,
+    request_type,
+    sketch_id,
+    photo_file_id,
+) -> None:
+    calls = []
+
+    class FakeAppointmentService:
+        def __init__(self, session):
+            self.session = session
+
+        async def create_pending_appointment(self, telegram_id, draft, username=None):
+            calls.append((telegram_id, username, draft))
+            return object()
+
+    monkeypatch.setattr(appointments, "AppointmentService", FakeAppointmentService)
+    state = FakeState()
+    state.data = {
+        "sketch_id": sketch_id,
+        "appointment_date": "2026-07-13",
+        "appointment_time": "12:00",
+        "appointment_comment": "Комментарий",
+        "appointment_request_type": request_type,
+        "client_sketch_photo_file_id": photo_file_id,
+    }
+    message = FakeMessage(CONFIRM_CREATE_REQUEST_BUTTON)
+
+    await appointments.confirm_appointment_creation(
+        message=message,
+        state=state,
+        session="session",
+    )
+
+    assert state.clear_called is True
+    assert len(calls) == 1
+    telegram_id, username, draft = calls[0]
+    assert telegram_id == 123
+    assert username == "client"
+    assert draft.request_type == request_type
+    assert draft.sketch_id == sketch_id
+    assert draft.client_sketch_photo_file_id == photo_file_id
+    assert message.answers[-1][0] == (
+        "Заявка создана и ожидает подтверждения.\n\n"
+        "После разговора с мастером админ подтвердит или отклонит заявку."
+    )
